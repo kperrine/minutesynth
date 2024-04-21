@@ -1,6 +1,6 @@
 # USynth
 
-AKA "MicroSynth", "Mu-Synth", or "$\mu$Synth"
+AKA "MicroSynth", "Mu-Synth", or "&mu;Synth"
 
 Copyright (C) Kenneth A. Perrine, 2024<br>
 Please see LICENSE file for MIT License<br>
