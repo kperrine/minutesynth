@@ -1,10 +1,159 @@
-# USynth Documentation
+# MintueSynth Intro
 
-Preliminary
+As in the README...
+
+This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was somewhat more compact than WebAudio itself could offer. It was used by Neurolyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
 
 ## Modules
 
+MinuteSynth is comprised of a number of modules that have a common interface for snapping them together. This is the general pattern seen in modules:
+
+
+
 ## Semantics
+
+Most of the modules follow these patterns:
+
+* A module is created by calling a module name with a set of parameters:
+  ```javascript
+  let myOscillator = M$.Osc({t: 'sine', f: 600})
+  ```
+* Inputs to modules (where the outputs of upstream modules patch to) are accessible with the `.in` property, but it is just necessary to use the upstream module reference itself with forward patch `.$()` method or reverse patch `r$` parameter and `r$()` method.
+  ```javascript
+  source.$(destination) // <-- Forward patch
+  destination.r$(source) // <-- Reverse patch
+  ```
+* There's a built-in gain node that's controlled with the `-g` parameter set to 1 by default
+  ```javascript
+  // Approach #1: Set upon instanciation:
+  let myOscillator = M$(Osc({t: 'sine', f: 600, g: 1/2}))
+  // Approach #2: Set once after instanciation:
+  let myOscillator = M$.Osc({t: 'sine', f: 600})
+  myOscillator.g.r$(1/2)
+  ```
+* Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
+* Multiple connections added together can be made by putting multiple parameters into an `[]` array.
+  ```javascript
+  let sinewave = M$.Osc({t: 'sine', f: 600}),
+      squarewave = M$.Osc({t: 'square', f: 400})
+  voice.r$([sinewave, squarewave])
+  ```
+* Most parameters can take a scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) object for it.
+  ```javascript
+  // Example 1: scalar:
+  let sinewave = M$.Osc({t: 'sine', f: 600, g: 1/2})
+  // Example 2: module:
+  let sinewave = M$.Osc({t: 'sine', f: 600, g: M$.Osc({t: 'sine', f: 30})})
+  // Example 3: both:
+  let sinewave = M$.Osc({t: 'sine', f: 600, g: [M$.Osc({t: 'sine', f: 30}), M$.C(1/2)]})
+  ```
+* All of these parameters can be set to have dynamically varying scalar values as input. If these parameters already have modules set as inputs, then the scalars are added as offsets to those existing inputs.
+  ```javascript
+  let signal = M$.C(1),
+      sinewave = M$.Osc({t: 'sine', f: 100, g: 1/4}),
+      biasedGain = M$.Gain({g: sinewave, r$: signal});
+  biasedGain.g.r$(M$.C(1/2));
+  // biasedGain will vary between 1/4 and 3/4.
+  // Note also this would produce the same effect:
+  biasedGain = M$.Gain({g: [sinewave, M$.C(1/2)], r$: signal});
+  ```
+* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can either take the string literal, or be substituted with a number that maps into a lookup table found in the MinuteSynth code. See the [Cheat Sheet](cheatsheet.md) for more info.
+  ```javascript
+  // String:
+  let sinewave = M$.Osc({t: 'sine', f: 100, g: 1/4})
+  // Shorthand number:
+  let sinewave = M$.Osc({t: 1, f: 100, g: 1/4})
+  ```
+
+## The Voice Module
+
+The `M$.Voice` module is a special module that represents the connection to the final output, which by default is the web browser's sound output. A couple extra features allow for default frequency control, and triggering of modules on/off.
+
+First, this would allow for a sound to be emitted indefinitely. Also, utilize the voice's built-in frequency controller to control the oscillator.
+```javascript
+let voice = M$.Voice({g: 1/4, f: 600}) // Make the voice half-gain
+let sinewave = M$.Osc({t: 'sine', f: voice.f})
+voice.r$(sinewave)
+```
+
+Next, if we wanted to delay the voice, we can utilize the current time record for the synthesizer and set events relative to that time.
+
+```javascript
+let now = M$.now()
+voice.off(now)
+voice.on(now + 1, 600) // Delay sound start in 1 second with freq. controller at 600 Hz
+voice.off(now + 2) // Then shut it off 1 second after that
+```
+
+Any module that cares to respond to these on and off events (e.g. those that have `on()` and `off()` methods themselves) can be patched to Voice using `Voice.$()`.
+
+## Time-Dependent Controls on Modules
+
+### Start/Stop
+
+Controlling sound on/off at the voice level is crude. It is better to be able to control when oscillators start and stop. Let's look at this example:
+```javascript
+let voice = M$.Voice({g: 1/4, f: 600})
+let osc1 = M$.Osc({t: 1, f: voice.f, s: -1})
+let osc2 = M$.Osc({t: 1, f: [voice.f, M$.C(-20)], s: -1}) // Detune 20 Hz lower
+voice.r$([osc1, osc2])
+```
+
+When we make the oscillators, we set the "start time" `s:` parameter to `-1` which means "defer starting". We can then add in this fine-tuned control for switching the oscillators on and off:
+
+```javascript
+let now = M$.now()
+osc1.s.go(now + 1)
+osc1.s.no(now + 3)
+osc2.s.go(now + 2)
+osc2.s.no(now + 4)
+```
+
+This causes osc1 to go after a 1-second delay, osc2 to start a second after that, and for each oscillator to stay on for 2 seconds.
+
+### Linear Controls
+
+Rather than manipulating the oscillators for on/off control, it is also possible to linearly control the gain nodes that are bundled with each oscillator. Adding this will allow more control over the sounds:
+```javascript
+osc1.g.vT(1, now + 1)
+osc1.g.lT(0, now + 3) // Linearly go from 1 to 0 in 2 sec.
+osc2.g.vT(1, now + 2)
+osc2.g.lT(0, now + 4) // Same
+```
+
+Controls include:
+
+| Method(Params) | Description |
+|-|-|
+| `vC(value)` | Set constant value for all time |
+| `vT(value, startTime)` | Set value at scheduled time |
+| `lT(value, endTime)` | Linear ramp to value at end time |
+| `eT(value, endTime)` | Exponental ramp to value at end time (0 is valid) |
+| `t(value, startTime, tc)` | Start nonlinear glide to value using given time constant (e.g. 1/3 gets 95% toward value over 1 sec.) |
+| `cv(values, startTime, dur)` | Calls WebAudio AudioParam setValueCurveAtTime() method
+| `c(startTime)` | Cancels scheduled events after the given time |
+| `h(holdTime)` | Cancels scheduled events after the given time, and holds the value constant at that time |
+| `z0()` | Sets value to 0 |
+
+These types of controls are available for most scalar parameters in MinuteSynth, including `M$.C` constants.
+
+### ADSR Controls
+
+
+
+
+## Time-Dependent Controls
+
+
+
+## Examples:
+
+
+
+
+## Semantics
+
+
 
 Most modules are created with a gain AudioNode built in. The gain amount can be set with the `.g` parameter, and is set to 1 by default.
 
@@ -64,3 +213,26 @@ The default ADSR lets the tone stay on until it is shut off. These are the value
 * s: sustain value (after the attack-decay sequence
 * r: release time (from s to b, occurring when off() is called)
 * p: auto-pulse-- if nonzero, automatically does an off() p seconds after on().
+
+
+
+If you want to route the output of a MinuteSynth module to a WebAudio node input, you can use the `connect()` method on the module's output:
+
+```javascript
+// Let's say we have an "analyser" object from WebAudio.
+let myOscillator = M$.Osc({t: 'sine', f: 30})
+myOscillator.z.connect(analyser)
+```
+
+## Timing
+
+In addition to ADSR:
+
+.eV, etc.
+
+
+## Triggers
+
+.go
+.no
+t$

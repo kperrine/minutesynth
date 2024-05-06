@@ -1,6 +1,6 @@
 # MinuteSynth
 
-"How it's pronounced is up to you!"
+*"How it's pronounced is up to you!"*
 
 Copyright (C) Kenneth A. Perrine, 2024<br>
 Please see LICENSE file for MIT License<br>
