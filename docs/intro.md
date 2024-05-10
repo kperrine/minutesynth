@@ -70,8 +70,9 @@ Most of the modules follow these patterns:
 The `M$.Voice` module is a special module that represents the connection to the final output, which by default is the web browser's sound output. A couple extra features allow for default frequency control, and triggering of modules on/off.
 
 First, this would allow for a sound to be emitted indefinitely. Also, utilize the voice's built-in frequency controller to control the oscillator.
+
 ```javascript
-let voice = M$.Voice({g: 1/4, f: 600}) // Make the voice half-gain
+let voice = M$.Voice({g: 1/4, f: 600}) // Make the voice quarter-gain
 let sinewave = M$.Osc({t: 'sine', f: voice.f})
 voice.r$(sinewave)
 ```
@@ -85,13 +86,14 @@ voice.on(now + 1, 600) // Delay sound start in 1 second with freq. controller at
 voice.off(now + 2) // Then shut it off 1 second after that
 ```
 
-Any module that cares to respond to these on and off events (e.g. those that have `on()` and `off()` methods themselves) can be patched to Voice using `Voice.$()`.
+Any module that cares to respond to these on and off events (e.g. those that have `on()` and `off()` methods, including `M$.ADSR`) can be patched to Voice using `Voice.$()`.
 
 ## Time-Dependent Controls on Modules
 
 ### Start/Stop
 
-Controlling sound on/off at the voice level is crude. It is better to be able to control when oscillators start and stop. Let's look at this example:
+Controlling sound on/off at the voice level may be crude. It may be advantageous to be able to control when individual oscillators start and stop. Let's look at this example:
+
 ```javascript
 let voice = M$.Voice({g: 1/4, f: 600})
 let osc1 = M$.Osc({t: 1, f: voice.f, s: -1})
@@ -99,7 +101,7 @@ let osc2 = M$.Osc({t: 1, f: [voice.f, M$.C(-20)], s: -1}) // Detune 20 Hz lower
 voice.r$([osc1, osc2])
 ```
 
-When we make the oscillators, we set the "start time" `s:` parameter to `-1` which means "defer starting". We can then add in this fine-tuned control for switching the oscillators on and off:
+When we make the oscillators in this example, we set the "start time" `s:` parameter to `-1` which means "defer starting". We can then add in this fine-tuned control for switching the oscillators on and off:
 
 ```javascript
 let now = M$.now()
@@ -111,9 +113,29 @@ osc2.s.no(now + 4)
 
 This causes osc1 to go after a 1-second delay, osc2 to start a second after that, and for each oscillator to stay on for 2 seconds.
 
-### Linear Controls
+### ADSR Controls
 
-Rather than manipulating the oscillators for on/off control, it is also possible to linearly control the gain nodes that are bundled with each oscillator. Adding this will allow more control over the sounds:
+Rather than manipulating the oscillators for on/off control, it is also possible to linearly control the gain nodes that are bundled with each oscillator. One model commonly used to change controls is "ADSR", or "Attack, Decay, Sustain, Release". The ADSR control has a series of parameters, illustrated in this figure:
+
+![ADSR illustration](img/adsr_curve.png)
+
+| Varibale | Meaning | Default |
+|-|-|-|
+| D | Start delay (sec) | 0 |
+| b | Base value (value of "off") | 0 |
+| e | Attack maximum value | 1 |
+| a | Attack time (sec) | 1e-3 |
+| d | Decay (time to go from e to s) | 0 |
+| s | Sustain value | 1 |
+| R | Release time (time to go from s to b when triggerOff) | 0 |
+| p | Auto-pulse (if nonzero, time to automatically triggerOff) | 0 |
+
+> **Trick:** It is possible to invert the ADSR curve by setting b > e or b > s.
+
+### Lower Level Controls
+
+The WebAudio value controls are also made available. This is an example of using:
+
 ```javascript
 osc1.g.vT(1, now + 1)
 osc1.g.lT(0, now + 3) // Linearly go from 1 to 0 in 2 sec.
@@ -137,12 +159,8 @@ Controls include:
 
 These types of controls are available for most scalar parameters in MinuteSynth, including `M$.C` constants.
 
-### ADSR Controls
 
 
-
-
-## Time-Dependent Controls
 
 
 
