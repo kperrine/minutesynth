@@ -16,6 +16,7 @@ Most of the modules follow these patterns:
 
 * A module is created by calling a module name with a set of parameters:
   ```javascript
+  // Create a sinewave with a fixed frequency of 600 Hz
   let myOscillator = M$.Osc({t: 'sine', f: 600})
   ```
 * Inputs to modules (where the outputs of upstream modules patch to) are accessible with the `.in` property, but it is just necessary to use the upstream module reference itself with forward patch `.$()` method or reverse patch `r$` parameter and `r$()` method.
@@ -23,29 +24,37 @@ Most of the modules follow these patterns:
   source.$(destination) // <-- Forward patch
   destination.r$(source) // <-- Reverse patch
   ```
-* There's a built-in gain node that's controlled with the `-g` parameter set to 1 by default
+* There's a built-in gain node that's controlled with the `g` parameter set to 1 by default
   ```javascript
-  // Approach #1: Set upon instanciation:
+  // Approach #1: Set gain to a constant half upon instanciation:
   let myOscillator = M$(Osc({t: 'sine', f: 600, g: 1/2}))
   // Approach #2: Set once after instanciation:
   let myOscillator = M$.Osc({t: 'sine', f: 600})
   myOscillator.g.r$(1/2)
+  // Approach #3: Set at specific time using vC()... see further below:
+  myOscillator.g.vC(1/2)
   ```
-* Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
-* Multiple connections added together can be made by putting multiple parameters into an `[]` array.
+  * Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
+* Multiple patches added together can be made by putting multiple parameters into an `[]` array.
   ```javascript
   let sinewave = M$.Osc({t: 'sine', f: 600}),
       squarewave = M$.Osc({t: 'square', f: 400})
   voice.r$([sinewave, squarewave])
   ```
-* Most parameters can take a scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) object for it.
+* Most parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) object for it.
   ```javascript
-  // Example 1: scalar:
+  // Example 1: Set the gain to a constant scalar:
   let sinewave = M$.Osc({t: 'sine', f: 600, g: 1/2})
-  // Example 2: module:
+  // Example 2: Set the gain to s 30Hz sinewave coming from a module:
   let sinewave = M$.Osc({t: 'sine', f: 600, g: M$.Osc({t: 'sine', f: 30})})
   // Example 3: both:
   let sinewave = M$.Osc({t: 'sine', f: 600, g: [M$.Osc({t: 'sine', f: 30}), M$.C(1/2)]})
+  // Example 3b: Set the final gain to be positive by scaling the 30 Hz
+  // sinewave to 1/2 and biasing by adding a constant 1/2 to that:
+  let sinewave = M$.Osc({t: 'sine', f: 600, g: [M$.Osc({t: 'sine', f: 30, g: 1/2}), M$.C(1/2)]})
+  // Example 3c: A clearer way to write that:
+  let tremolo = M$.Osc({t: 'sine', f: 30, g: 1/2})
+  let sinewave = M$.Osc({t: 'sine', f: 600, g: [tremolo, M$.C(1/2)]})
   ```
 * All of these parameters can be set to have dynamically varying scalar values as input. If these parameters already have modules set as inputs, then the scalars are added as offsets to those existing inputs.
   ```javascript
@@ -127,7 +136,7 @@ Rather than manipulating the oscillators for on/off control, it is also possible
 | a | Attack time (sec) | 1e-3 |
 | d | Decay (time to go from e to s) | 0 |
 | s | Sustain value | 1 |
-| R | Release time (time to go from s to b when triggerOff) | 0 |
+| r | Release time (time to go from s to b when triggerOff) | 0 |
 | p | Auto-pulse (if nonzero, time to automatically triggerOff) | 0 |
 
 > **Trick:** It is possible to invert the ADSR curve by setting b > e or b > s.
