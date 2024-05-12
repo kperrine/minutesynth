@@ -2,6 +2,12 @@
 <html>
 <head>
 <style>
+.tabPanel {
+    width: 100%;
+    display: block;
+    border-color: black;
+    border-width: 0.75pt;
+}
 .keyBorder {
     width: 30em;
     height: 12em;
@@ -48,6 +54,14 @@
 .blackPressed {
     background-color: gray;
 }
+#recordPanel {
+    position: absolute;
+    visibility: hidden;
+}
+#keyPanel {
+    position: absolute;
+    visibility: visible;
+}
 #cN {
     left: 0%;
 }
@@ -91,15 +105,19 @@
 <script>
 "use strict";
 
-const MAPPING = {cn: 0, cs: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
+const MAPPING = {cN: 0, cS: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
     gN: 7, gS: 8, aN: 9, aS: 10, bN: 11, cH: 12
 }
+
+let currentID = ""
+let activeID = ""
+
 function highlightKey(keyID, activate) {
     if (!(keyID in MAPPING)) {
         return
     }
     const element = document.getElementById(keyID)
-    if ("whiteKey" in element.classList) {
+    if (element.classList.contains("whiteKey")) {
         if (activate) {
             element.classList.add("whitePressed")
         }
@@ -107,7 +125,7 @@ function highlightKey(keyID, activate) {
             element.classList.remove("whitePressed")
         }
     }
-    else if ("blackKey" in element.classList) {
+    else if (element.classList.contains("blackKey")) {
         if (activate) {
             element.classList.add("blackPressed")
         }
@@ -116,46 +134,68 @@ function highlightKey(keyID, activate) {
         }
     }
 }
-function init() {
-    let currentID = ""
-    let activeID = ""
-    document.addEventListener('mousemove', event => {
-        const underElement = document.elementFromPoint(event.clientX, event.clientY)        
-        currentID = ""
-        if (underElement.id in MAPPING) {
-            currentID = underElement.id
-        }
-        if (currentID !== "") {
-            if (activeID !== "" && activeID != currentID) {
-                console.log(`Activating Key: ${MAPPING[currentID]}`)
-                highlightKey(activeID, false)
-                highlightKey(currentID, true)
-                activeID = currentID
-            }
-        }
-    })
-    document.addEventListener('mousedown', event => {
-        if (currentID !== "") {
+function keyZoneMovement(event) {
+    const underElement = document.elementFromPoint(event.clientX, event.clientY)        
+    currentID = ""
+    if (underElement.id in MAPPING) {
+        currentID = underElement.id
+    }
+    if (currentID !== "") {
+        if (activeID !== "" && activeID != currentID) {
             console.log(`Activating Key: ${MAPPING[currentID]}`)
+            highlightKey(activeID, false)
             highlightKey(currentID, true)
             activeID = currentID
         }
-    })
-    document.addEventListener('mouseup', event => {
-        if (activeID !== "") {
-            console.log(`Deactivating Key: ${MAPPING[activeID]}`)
-            highlightKey(activeID, false)
-            activeID = ""
-        }        
-    })
+    }
+}
+function pressAction(event) {
+    if (currentID !== "") {
+        console.log(`Activating Key: ${MAPPING[currentID]}`)
+        highlightKey(currentID, true)
+        activeID = currentID
+    }
+}
+function releaseAction(event) {
+    if (activeID !== "") {
+        console.log(`Deactivating Key: ${MAPPING[activeID]}`)
+        highlightKey(activeID, false)
+        activeID = ""
+    }        
+}
+function showKeyboard() {
+    document.getElementById("showKeyboard").disabled = true
+    document.getElementById("showRecording").disabled = false
+    document.getElementById("keyPanel").style.visibility = 'visible'
+    document.getElementById("recordPanel").style.visibility = 'hidden'
+}
+function showRecording() {
+    document.getElementById("showKeyboard").disabled = false
+    document.getElementById("showRecording").disabled = true
+    document.getElementById("keyPanel").style.visibility = 'hidden'
+    document.getElementById("recordPanel").style.visibility = 'visible'
+}
+function init() {
+    document.addEventListener('mousemove', keyZoneMovement)
+    document.addEventListener('mousedown', pressAction)
+    document.addEventListener('mouseup', releaseAction)
+    document.addEventListener('touchmove', keyZoneMovement)
+    document.addEventListener('touchstart', pressAction)
+    document.addEventListener('touchend', releaseAction)
+    document.addEventListener('touchcancel', releaseAction)
 }
 
 </script>
 </head>
 <body onload="init();">
 
-<h1>Keyboard</h1>
-<p>Here is a keyboard.</p>
+<button id="showKeyboard" onclick="showKeyboard();" disabled>Keyboard</button>
+<button id="showRecording" onclick="showRecording();">Recording</button>
+<div class="tabPanel">
+<div id="recordPanel">
+Stuff.
+</div>
+<div id="keyPanel">
 <div class="keyBorder"><div class="keyArea">
     <div class="whiteKey" id="cN"></div>
     <div class="blackKey" id="cS"></div>
@@ -171,7 +211,10 @@ function init() {
     <div class="whiteKey" id="bN"></div>
     <div class="whiteKey" id="cH"></div>
 </div></div>
-<p>That's it.</p>
+<label for="octave">Octave: </label>
+<input type="number" id="octave" min="0" max="9" maxlength="1" value="3" />
+</div>
+</div>
 
 </body>
 </html>
