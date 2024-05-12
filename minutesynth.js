@@ -51,7 +51,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // Params: t: type; S: scale; f: default frequency; d: detune, g: gain; s: start time; r: real values;
   //         i: imag. values, n: nominal playback frequncy (for custom waveform)
   // Type: 1 = sine, 2 = square, 3 = sawtooth, 4 = triangle, 5 = custom
-  O({t, S = 1, f, d, g = 1, s = 0, r, i, n = 1}) {
+  Osc({t, S = 1, f, d, g = 1, s = 0, r, i, n = 1}) {
     let module = {
       ...U._ModuleBaseAmp(g),
       o: ac.createOscillator(),
@@ -69,6 +69,12 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     module.o.connect(module.z);
     return module;
   },
+  // Convenience/clarity constants:
+  sine: 1,
+  square: 2,
+  sawtooth: 3,
+  triangle: 4,
+  custom: 5,
 
   // B (Buffer) represents a block of memory that specifies samples. Access the memory with x();
   // the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
@@ -164,6 +170,15 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     module.q.connect(module.z);
     return module;
   },
+  // Convenience/clarity constants:
+ lowpass: 1,
+ highpass: 2,
+ bandpass: 3,
+ lowshelf: 4,
+ highshelf: 5,
+ peaking: 6,
+ notch: 7,
+ allpass: 8,
 
   // K (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
   // Params: b: BufferNode, g: gain, r$: input

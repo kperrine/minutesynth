@@ -17,28 +17,32 @@ Most of the modules follow these patterns:
 * A module is created by calling a module name with a set of parameters:
   ```javascript
   // Create a sinewave with a fixed frequency of 600 Hz
-  let myOscillator = M$.Osc({t: 'sine', f: 600})
+  let myOscillator = M$.Osc({ M$.sine, f: 600 })
   ```
-* Inputs to modules (where the outputs of upstream modules patch to) are accessible with the `.in` property, but it is just necessary to use the upstream module reference itself with forward patch `.$()` method or reverse patch `r$` parameter and `r$()` method.
+* Patches between upstream and downstream modules can be made:
+  * Forward patch: `.$()` method
+  * Reverse patch `.r$()` method, and also `r$` parameter upon instanciation.
   ```javascript
   source.$(destination) // <-- Forward patch
   destination.r$(source) // <-- Reverse patch
+
+  // And, reverse-patch-upon-instanciation example:
+  let filter = M$.Filt({ t: M$.lowpass, q: 10, f: 300, r$: source })
   ```
-* There's a built-in gain node that's controlled with the `g` parameter set to 1 by default
+* There's often a built-in gain node that's controlled with the `g` parameter set to 1 by default:
   ```javascript
   // Approach #1: Set gain to a constant half upon instanciation:
-  let myOscillator = M$(Osc({t: 'sine', f: 600, g: 1/2}))
+  let myOscillator = M$(Osc({ t: M$.sine, f: 600, g: 1/2 }))
   // Approach #2: Set once after instanciation:
-  let myOscillator = M$.Osc({t: 'sine', f: 600})
+  let myOscillator = M$.Osc({ t: M$.sine, f: 600 })
   myOscillator.g.r$(1/2)
   // Approach #3: Set at specific time using vC()... see further below:
   myOscillator.g.vC(1/2)
   ```
-  * Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
 * Multiple patches added together can be made by putting multiple parameters into an `[]` array.
   ```javascript
-  let sinewave = M$.Osc({t: 'sine', f: 600}),
-      squarewave = M$.Osc({t: 'square', f: 400})
+  let sinewave = M$.Osc({ t: M$.sine, f: 600 }),
+      squarewave = M$.Osc({ t: M$.square, f: 400 })
   voice.r$([sinewave, squarewave])
   ```
 * Most parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) object for it.
@@ -73,6 +77,10 @@ Most of the modules follow these patterns:
   // Shorthand number:
   let sinewave = M$.Osc({t: 1, f: 100, g: 1/4})
   ```
+
+Other esoteric details:
+
+* Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
 
 ## The Voice Module
 
