@@ -32,65 +32,81 @@ Most of the modules follow these patterns:
 * There's often a built-in gain node that's controlled with the `g` parameter set to 1 by default:
   ```javascript
   // Approach #1: Set gain to a constant half upon instanciation:
-  let myOscillator = M$(Osc({ t: M$.sine, f: 600, g: 1/2 }))
+  let myOscillator = M$.Osc({ t: M$.sine, f: 600, g: 1/2 })
   // Approach #2: Set once after instanciation:
   let myOscillator = M$.Osc({ t: M$.sine, f: 600 })
   myOscillator.g.r$(1/2)
   // Approach #3: Set at specific time using vC()... see further below:
   myOscillator.g.vC(1/2)
   ```
-* Multiple patches added together can be made by putting multiple parameters into an `[]` array.
+* Multiple patches are added together when an `[]` array is used:
   ```javascript
   let sinewave = M$.Osc({ t: M$.sine, f: 600 }),
       squarewave = M$.Osc({ t: M$.square, f: 400 })
   voice.r$([sinewave, squarewave])
   ```
-* Most parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) object for it.
+* The `M$.Gain` module will multiply patches together:
   ```javascript
-  // Example 1: Set the gain to a constant scalar:
-  let sinewave = M$.Osc({t: 'sine', f: 600, g: 1/2})
-  // Example 2: Set the gain to s 30Hz sinewave coming from a module:
-  let sinewave = M$.Osc({t: 'sine', f: 600, g: M$.Osc({t: 'sine', f: 30})})
-  // Example 3: both:
-  let sinewave = M$.Osc({t: 'sine', f: 600, g: [M$.Osc({t: 'sine', f: 30}), M$.C(1/2)]})
+  let multResult = M$.Gain({ g: sinewave, r$ squarewave })
+  voice.r$(multResult)
+  ```
+* Most parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) module for it.
+  ```javascript
+  // Example 1: Set the gain to a constant scalar 1/2:
+  let sinewave = M$.Osc({ t: M$.sine, f: 600, g: 1/2 })
+  // Example 2: Set the gain to a 30Hz sinewave:
+  let sinewave = M$.Osc({ t: M$.sine, f: 600, g: M$.Osc({ t: M$.sine, f: 30 }) })
+  // Example 3: both: adds 1/2 to the 30Hz sinewave:
+  let sinewave = M$.Osc({ t: M$.sine, f: 600,
+                          g: [M$.Osc({ t: M$.sine, f: 30 }), M$.C(1/2)] })
   // Example 3b: Set the final gain to be positive by scaling the 30 Hz
   // sinewave to 1/2 and biasing by adding a constant 1/2 to that:
-  let sinewave = M$.Osc({t: 'sine', f: 600, g: [M$.Osc({t: 'sine', f: 30, g: 1/2}), M$.C(1/2)]})
+  let sinewave = M$.Osc({ t: M$.sine, f: 600,
+                          g: [M$.Osc({t: M$.sine, f: 30, g: 1/2}), M$.C(1/2)] })
   // Example 3c: A clearer way to write that:
-  let tremolo = M$.Osc({t: 'sine', f: 30, g: 1/2})
-  let sinewave = M$.Osc({t: 'sine', f: 600, g: [tremolo, M$.C(1/2)]})
+  let tremolo = M$.Osc({ t: M$.sine, f: 30, g: 1/2 })
+  let sinewave = M$.Osc({ t: M$.sine, f: 600, g: [tremolo, M$.C(1/2)] })
   ```
-* All of these parameters can be set to have dynamically varying scalar values as input. If these parameters already have modules set as inputs, then the scalars are added as offsets to those existing inputs.
+* All of these parameters can be set to have dynamically varying scalar values as input. If these parameters already have modules set as inputs, then the scalars are added as offsets to those existing inputs:
   ```javascript
   let signal = M$.C(1),
-      sinewave = M$.Osc({t: 'sine', f: 100, g: 1/4}),
-      biasedGain = M$.Gain({g: sinewave, r$: signal});
+      sinewave = M$.Osc({ t: M$.sine, f: 100, g: 1/4 }),
+      biasedGain = M$.Gain({ g: sinewave, r$: signal })
   biasedGain.g.r$(M$.C(1/2));
-  // biasedGain will vary between 1/4 and 3/4.
+  // biasedGain will now vary between 1/4 and 3/4.
   // Note also this would produce the same effect:
-  biasedGain = M$.Gain({g: [sinewave, M$.C(1/2)], r$: signal});
-  ```
-* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can either take the string literal, or be substituted with a number that maps into a lookup table found in the MinuteSynth code. See the [Cheat Sheet](cheatsheet.md) for more info.
-  ```javascript
-  // String:
-  let sinewave = M$.Osc({t: 'sine', f: 100, g: 1/4})
-  // Shorthand number:
-  let sinewave = M$.Osc({t: 1, f: 100, g: 1/4})
+  biasedGain = M$.Gain({ g: [sinewave, M$.C(1/2)], r$: signal });
   ```
 
 Other esoteric details:
 
+* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can take the string literal (e.g. `'sine'`), take the M$ convenience attribute (e.g. `M$.sine`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Cheat Sheet](cheatsheet.md) for more info.
+  ```javascript
+  // String:
+  let sinewave = M$.Osc({ t: 'sine', f: 100, g: 1/4 })
+  // Convenience attribute:
+  let sinewave = M$.Osc({ t: M$.sine, f: 100, g: 1/4 })
+  // Shorthand number:
+  let sinewave = M$.Osc({ t: 1, f: 100, g: 1/4 })
+  ```
+* The Distorter `M$.Dist` module takes an `a` parameter for "amount". It can range from -2.9 to 100 or beyond. Values below 0 map to an exponential curve where low audio values are quieted, and values above 0 map to a sigmoid where low audio values are amplified.
 * Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
+* If you want to route the output of a MinuteSynth module to a WebAudio node input, you can use the `connect()` method on the module's output:
+  ```javascript
+  // Let's say we have an "analyser" object from WebAudio.
+  let myOscillator = M$.Osc({ t: M$.sine, f: 30 })
+  myOscillator.z.connect(analyser)
+  ```
 
 ## The Voice Module
 
 The `M$.Voice` module is a special module that represents the connection to the final output, which by default is the web browser's sound output. A couple extra features allow for default frequency control, and triggering of modules on/off.
 
-First, this would allow for a sound to be emitted indefinitely. Also, utilize the voice's built-in frequency controller to control the oscillator.
+As a first example, the code snippet below would allow for a sound to be emitted indefinitely. Also, this would allow the voice's built-in frequency controller to control the oscillator.
 
 ```javascript
-let voice = M$.Voice({g: 1/4, f: 600}) // Make the voice quarter-gain
-let sinewave = M$.Osc({t: 'sine', f: voice.f})
+let voice = M$.Voice({ g: 1/4, f: 600 }) // Make the voice request 600 Hz at quarter-gain
+let sinewave = M$.Osc({ t: M$.sine, f: voice.f }) // Patch the voice's freq. control to Osc
 voice.r$(sinewave)
 ```
 
@@ -112,9 +128,9 @@ Any module that cares to respond to these on and off events (e.g. those that hav
 Controlling sound on/off at the voice level may be crude. It may be advantageous to be able to control when individual oscillators start and stop. Let's look at this example:
 
 ```javascript
-let voice = M$.Voice({g: 1/4, f: 600})
-let osc1 = M$.Osc({t: 1, f: voice.f, s: -1})
-let osc2 = M$.Osc({t: 1, f: [voice.f, M$.C(-20)], s: -1}) // Detune 20 Hz lower
+let voice = M$.Voice({ g: 1/4, f: 600 })
+let osc1 = M$.Osc({ t: 1, f: voice.f, s: -1 })
+let osc2 = M$.Osc({ t: 1, f: [voice.f, M$.C(-20)], s: -1 }) // Detune 20 Hz lower
 voice.r$([osc1, osc2])
 ```
 
@@ -128,11 +144,13 @@ osc2.s.go(now + 2)
 osc2.s.no(now + 4)
 ```
 
-This causes osc1 to go after a 1-second delay, osc2 to start a second after that, and for each oscillator to stay on for 2 seconds.
+This causes osc1 to go after a 1-second delay, osc2 to start a second after that, and for oscillators to stop 2 seconds later each.
+
+Oscillators, Noise, and Buffer (`O`, `N`, and `B`) all have a scalar "start" parameter `s` that tells the respective AudioNode objects to start at specific times. If `s` is undefined, then the start happens immediately. If it is -1, then they won't start until the `.go()` method is called.
 
 ### ADSR Controls
 
-Rather than manipulating the oscillators for on/off control, it is also possible to linearly control the gain nodes that are bundled with each oscillator. One model commonly used to change controls is "ADSR", or "Attack, Decay, Sustain, Release". The ADSR control has a series of parameters, illustrated in this figure:
+It is also possible to linearly control the gain nodes that are bundled with each oscillator (or similarly control almost any parameter, for that matter). One model commonly used to change controls is "ADSR", or "Attack, Decay, Sustain, Release". The ADSR control has a series of parameters, illustrated in this figure:
 
 ![ADSR illustration](img/adsr_curve.png)
 
@@ -176,60 +194,6 @@ Controls include:
 
 These types of controls are available for most scalar parameters in MinuteSynth, including `M$.C` constants.
 
-
-
-
-
-
-## Examples:
-
-
-
-
-## Semantics
-
-
-
-Most modules are created with a gain AudioNode built in. The gain amount can be set with the `.g` parameter, and is set to 1 by default.
-
-The output of each module, which is usually a gain AudioNode, is accessible by the `.z` property.
-
-The main audio input of a module is accessible with the `.in` property, but when patching, you just need to use the module name itself.
-
-Most parameters (those set up with the `._addParam` method internally) can take a scalar as an input, a module as an input, or an array. An array will add all of the inputs together. If you want to have a scalar in an array, you'll need to create a `U.C` object for it.
-
-```javascript
-U.G({g: 0.7}) // Multiplies the input by 0.7
-U.G({g: U.O({t: 'sine', f: 2, g: 0.8})}) // Oscillates multiplier from -0.8 to 0.8 at 2 Hz
-U.G({g: [U.C(0.7), U.O({t: 1, f: 2, g: 0.8}])}) // Oscillates from -0.1 to 1.5 at 2 Hz. 
-```
-
-All of these parameters can be set to have dynamically varying scalar values as input through the methods offered by the `_ParamValue` object. If these parameters already have modules set as inputs, then the scalars are added as offsets to those existing inputs.
-
-The "type" parameter `.t` on Oscillators and Filters (`O` and `Q`) can either take the string literal, or be substituted with a number that maps into a lookup table found in the USynth code.
-
-To "patch in" one module to another, you can do this with the "bind" `.$()` or "reverse bind" `.r$()` methods:
-
-```javascript
-source.$(destination)
-destination.r$(source)
-```
-
-For multiples:
-
-```javascript
-source.$(destination1).$(destination2)
-destination.r$([source1, source2]) // Adds source1 and source2 together.
-```
-
-Most module declarations take a "reverse bind" `r$` parameter for ease of connecting modules together.
-
-Oscillators, Noise, and Buffer (`O`, `N`, and `B`) have a scalar "start" parameter `s` that tells the respective AudioNode objects to start at specific times. If `s` is undefined, then the start happens immediately. If it is -1, then they won't start until the `.go()` method is called. (TODO: Could make them go if triggered).
-
-If Oscillators, etc. are told to start, they'll be generating sound. The sound will be heard unless a gain parameter somewhere in the pipeline shuts the sound off until a trigger happens (e.g. through an ADSR connected to a gain module).
-
-The Distorter `U.D` module takes an `a` parameter for "amount". It can range from -2.9 to 100 or beyond. Values below 0 map to an exponential curve where low audio values are quieted, and values above 0 map to a sigmoid where low audio values are amplified.
-
 ## The Voice Module
 
 The Voice module automatically connects to the AudioContext's destination, and contains a frequency controller (accessible through `.f`, and distributes triggered when its `.on()` and `.off()`) methods are called. It also has a gain AudioNode that can control the volume for everything that is output.
@@ -248,26 +212,3 @@ The default ADSR lets the tone stay on until it is shut off. These are the value
 * s: sustain value (after the attack-decay sequence
 * r: release time (from s to b, occurring when off() is called)
 * p: auto-pulse-- if nonzero, automatically does an off() p seconds after on().
-
-
-
-If you want to route the output of a MinuteSynth module to a WebAudio node input, you can use the `connect()` method on the module's output:
-
-```javascript
-// Let's say we have an "analyser" object from WebAudio.
-let myOscillator = M$.Osc({t: 'sine', f: 30})
-myOscillator.z.connect(analyser)
-```
-
-## Timing
-
-In addition to ADSR:
-
-.eV, etc.
-
-
-## Triggers
-
-.go
-.no
-t$

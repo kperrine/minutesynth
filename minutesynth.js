@@ -46,7 +46,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // Common attribute semantics:
   // z: output AudioNode
 
-  // O (Oscillaor) is a simple tone generator. Specify its type and also scale, which can transform
+  // Osc (Oscillaor) is a simple tone generator. Specify its type and also scale, which can transform
   // the incoming base frequency when the module is triggered. Specify r and i arrays for periodic wave.
   // Params: t: type; S: scale; f: default frequency; d: detune, g: gain; s: start time; r: real values;
   //         i: imag. values, n: nominal playback frequncy (for custom waveform)
@@ -69,18 +69,18 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     module.o.connect(module.z);
     return module;
   },
-  // Convenience/clarity constants:
+  // Convenience/clarity constants for t: type:
   sine: 1,
   square: 2,
   sawtooth: 3,
   triangle: 4,
   custom: 5,
 
-  // B (Buffer) represents a block of memory that specifies samples. Access the memory with x();
+  // Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
   // the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
   // Params: T: duration; c: channels; S: scale; g: gain; s: start time; F: sampling rate
   //         r: playback rate; d: detune; n: nominal playback frequency (0 for no freq. control)
-  B({T = 1, c = 1, S = 1, g = 1, s = 0, F = U.SR, r = 1, d, n = 0, f}) {
+  Buf({T = 1, c = 1, S = 1, g = 1, s = 0, F = U.SR, r = 1, d, n = 0, f}) {
     let module = {
       ...U._ModuleBaseAmp(g),
       b: ac.createBuffer(c, ~~(F * T), F),
@@ -110,9 +110,9 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // N (Noise) produces a playable buffer of noise.
+  // Noise produces a playable buffer of noise.
   // Params: g: gain; s: start time
-  N({g = 1, s = 0, r, d} = {}) {
+  Noise({ g = 1, s = 0, r, d } = {}) {
     let module = U.B({T: U._NOISE_LEN, g, s, r, d, n: 0}),
         data = module.x(0),
         i;
@@ -123,10 +123,10 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // E (Pulse) produces a pulse waveform of width w at offset o.
+  // Pulse produces a pulse waveform of width w at offset o.
   // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
   //         Also: W: samples
-  E({w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024} = {}) {
+  Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
     let module = U.B({T: W / U.SR, S, f, g, s, n: 1}),
         data = module.x(0),
@@ -139,10 +139,10 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // D (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-  // Params: F: distort function (default: dw), a: function parameter, r$: input
+  // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
+  // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
   // TODO: Input param: y?
-  D({a = 50, F = _ => U.dw(a), g = 1, r$}) {
+  Dist({ a = 50, F = _ => U.dw(a), g = 1, r$ }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       w: ac.createWaveShaper()
@@ -154,9 +154,9 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // Q (Filter) allows for filtering of sound using the filter type provided in t.
+  // Filt (Filter) allows for filtering of sound using the filter type provided in t.
   // Params: t: type, q: Q value, f: frequency, S: scale, b: boost, g: gain, r$: input
-  Q({t, q, f, S = 1, b, g = 1, r$}) {
+  Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       q: ac.createBiquadFilter(),
@@ -170,19 +170,20 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     module.q.connect(module.z);
     return module;
   },
-  // Convenience/clarity constants:
- lowpass: 1,
- highpass: 2,
- bandpass: 3,
- lowshelf: 4,
- highshelf: 5,
- peaking: 6,
- notch: 7,
- allpass: 8,
+  // Convenience/clarity constants for t: type:
+  lowpass: 1,
+  highpass: 2,
+  bandpass: 3,
+  lowshelf: 4,
+  highshelf: 5,
+  peaking: 6,
+  notch: 7,
+  allpass: 8,
 
-  // K (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
-  // Params: b: BufferNode, g: gain, r$: input
-  K({b, g = 1, n = true, r$}) {
+  // Conv (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
+  // Use b: M$.reverb() for a simple reverb effect.
+  // Params: b: BufferNode, g: gain, n: normalize (true by defualt), r$: input
+  Conv({ b, g=1, n=true, r$ }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       c: ac.createConvolver(),
@@ -195,9 +196,9 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // R (Compressor) 
+  // Comp (Compressor) 
   // Params: t: threshold, k: knee, o: ratio, d: reduction, a: attack, r: release
-  R({t, k, o, d, a, r, g=1, r$}={}) {
+  Comp({ t, k, o, d, a, r, g=1, r$ }={}) {
     let module = {
       ...U._ModuleBaseAmp(g),
       R: ac.createDynamicsCompressor()
@@ -224,20 +225,21 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // G (Amplifier) is a very simple module that acts as a multiplier.
+  // Gain (Amplifier) is a very simple module that acts as a multiplier.
   // Params: g: gain value; r$: input
-  G({g = 1, r$} = {}) {
+  Gain({ g = 1, r$ } = {}) {
     let module = U._ModuleBaseAmp(g);
     module._addParam(U._ParamAudio(module.z, module, r$));
     return module;
   },
 
   // mA (makeADSR) assists in creating ADSR parameters by filling in the defaults.
-  mA: adsr => ({...U._DEFAULT_ADSR, ...adsr}),
+  mA: adsr => ({ ...U._DEFAULT_ADSR, ...adsr }),
 
-  // A (ADSRModule) uses ADSR parameters to create a module that can allow values to ramp up and
-  // down whenever the module is triggered. Use t$ to reverse-bind a trigger.
-  A(adsr = U._DEFAULT_ADSR, t$) {
+  // ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
+  // can allow values to ramp up and down whenever the module is triggered. Use the t$ 
+  // (second parameter) to reverse-bind a trigger.
+  ADSR(adsr = U._DEFAULT_ADSR, t$) {
     let module = {
       ...U.C(),
       a: U.mA(adsr),
@@ -283,20 +285,20 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // P (Program) orchestrates a series of values on a constant output that can be triggered.
+  // Prog (Program) orchestrates a series of values on a constant output that can be triggered.
   // Params: t: timesteps (seconds from trigger) array, v: values array, p: portamento (glide) time
-  P({t, v, p = 0}) {
-    let module = U.F(p);
+  Prog({ t, v, p = 0 }) {
+    let module = U.Freq(p);
     module.on = (onTime, freq) => {
       // TODO: Figure out if this will bind early.
       t.forEach((time, i) => module.on(onTime + time, v[i]));
     }
   },
 
-  // S (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
+  // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
   // Gains are defaulted to 1 unless an array of gains are specified.
   // Params: F: Array of frequencies, G: Array of gains (default: 1's), n = nominal frequency, R = sample size
-  S({F, G, n = 440, R = U.SR/4, f, s = 0, g = 1, S = 1}) {
+  Spec({ F, G, n = 440, R = U.SR/4, f, s = 0, g = 1, S = 1 }) {
     let real = new Array(R).fill(0),
         imag = [...real],
         i, j;
@@ -306,14 +308,14 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
         real[j] = G ? G[i] : 1;
       }
     }
-    let module = U.O({r: real, i: imag, f, s, g, S: U.SR/R * S, n});
+    let module = U.Osc({ r: real, i: imag, f, s, g, S: U.SR/R * S, n });
     return module;
   },
 
-  // F (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
+  // Freq (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
   // It centrally manages a frequency and optionally has a glide (portamento) capability.
-  // Use t$ to reverse-bind a trigger.
-  F({p = 0, t$} = {}) {
+  // Use the t$ (second parameter) to reverse-bind a trigger.
+  Freq({ p = 0, t$ } = {}) {
     let module = {
       ...U.C(),
       p,
@@ -338,11 +340,11 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     return module;
   },
 
-  // V (Voice) represents a single channel of sound that is controlled by one main frequency.
+  // Voice represents a single channel of sound that is controlled by one main frequency.
   // The gain g is the final "volume control" and its output is the AudioContext's destination.
   // Set v to zero to disable attaching to ac.destination. You can get final WebAudio from .z.
   // An automatically generated frequency controller is available at .f.
-  V({g = 0.5, v = 1, p, r$} = {}) {
+  Voice({ g = 0.5, v = 1, p, r$ } = {}) {
     // TODO: Allow inputs to be registrants
     let ret = {
       ...U.G({g, r$}),
@@ -465,7 +467,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
     _addFreqHelper(control, defFreq = 0) {
       let Z = this;
       control.value = 0;
-      Z._S = U.G();
+      Z._S = U.Gain();
       if (!isNaN(defFreq)) {
         // If the default value is a number, then create a constant for it:
         Z._C = U.C(defFreq);
@@ -597,16 +599,16 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   /*
    * Support functions:
    */
-  // sr (SimpleReverb) is a simple reverb effect, borrowed from
+  // reverb() is a simple reverb effect, borrowed from
   // https://github.com/adelespinasse/reverbGen/blob/master/reverbgen.js
-  sr(fadeInTime, decayTime, subsample, numChan = 2) {
+  reverb(fadeInTime, decayTime, subsample, numChan = 2) {
     // params.decayTime is the -60dB fade time. We let it go 50% longer to get to -90dB.
     let totalTime = decayTime * 1.5,
       decaySampleFrames = ~~(decayTime * U.SR),
       fadeInSampleFrames = ~~(fadeInTime * U.SR),
         // 60dB is a factor of 1 million in power, or 1000 in amplitude.
       decayBase = 1e-3 ** (1 / decaySampleFrames),
-      reverbIR = U.B({c: numChan, T: totalTime}),
+      reverbIR = U.Buf({c: numChan, T: totalTime}),
       i, j, chan;
     for (i = 0; i < numChan; i++) {
       chan = reverbIR.x(i);
