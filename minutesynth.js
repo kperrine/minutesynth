@@ -347,11 +347,11 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   Voice({ g = 0.5, v = 1, p, r$ } = {}) {
     // TODO: Allow inputs to be registrants
     let ret = {
-      ...U.G({g, r$}),
+      ...U.Gain({g, r$}),
       _modules: [],
 
       // f is the Voice's main frequency control. Set it by calling on().
-      f: U.F({p}),
+      f: U.Freq({p}),
 
       // _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
       // connection. Return a nonzero to automatically remove values from input.

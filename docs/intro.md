@@ -2,13 +2,15 @@
 
 As in the README...
 
-This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was somewhat more compact than WebAudio itself could offer. It was used by Neurolyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
+This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was more compact than WebAudio itself could offer. It was used by Neurolyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
 
 ## Modules
 
 MinuteSynth is comprised of a number of modules that have a common interface for snapping them together. This is the general pattern seen in modules:
 
+![Module Structure](img/module_struct.png)
 
+The next section explains further.
 
 ## Semantics
 
@@ -17,9 +19,10 @@ Most of the modules follow these patterns:
 * A module is created by calling a module name with a set of parameters:
   ```javascript
   // Create a sinewave with a fixed frequency of 600 Hz
-  let myOscillator = M$.Osc({ M$.sine, f: 600 })
+  let myOscillator = M$.Osc({ t: M$.sine, f: 600 })
   ```
-* Patches between upstream and downstream modules can be made:
+  * Some parameters may be patchable, optionally able to receive upstream modules (`f:` in the example can do this), while other parameters are preset scalars that never change.
+* Main audio patches between upstream and downstream modules can be made:
   * Forward patch: `.$()` method
   * Reverse patch `.r$()` method, and also `r$` parameter upon instanciation.
   ```javascript
@@ -29,9 +32,9 @@ Most of the modules follow these patterns:
   // And, reverse-patch-upon-instanciation example:
   let filter = M$.Filt({ t: M$.lowpass, q: 10, f: 300, r$: source })
   ```
-* There's often a built-in gain node that's controlled with the `g` parameter set to 1 by default:
+* There's often a built-in gain node that's controlled with the `g:` patchable parameter set to `1` by default:
   ```javascript
-  // Approach #1: Set gain to a constant half upon instanciation:
+  // Approach #1: Set gain to a constant 1/2 upon instanciation:
   let myOscillator = M$.Osc({ t: M$.sine, f: 600, g: 1/2 })
   // Approach #2: Set once after instanciation:
   let myOscillator = M$.Osc({ t: M$.sine, f: 600 })
@@ -50,37 +53,37 @@ Most of the modules follow these patterns:
   let multResult = M$.Gain({ g: sinewave, r$ squarewave })
   voice.r$(multResult)
   ```
-* Most parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) module for it.
+* Patchable parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) module for it.
   ```javascript
   // Example 1: Set the gain to a constant scalar 1/2:
   let sinewave = M$.Osc({ t: M$.sine, f: 600, g: 1/2 })
-  // Example 2: Set the gain to a 30Hz sinewave:
-  let sinewave = M$.Osc({ t: M$.sine, f: 600, g: M$.Osc({ t: M$.sine, f: 30 }) })
-  // Example 3: both: adds 1/2 to the 30Hz sinewave:
+  // Example 2: Set the gain to a 3 Hz sinewave:
+  let sinewave = M$.Osc({ t: M$.sine, f: 600, g: M$.Osc({ t: M$.sine, f: 3 }) })
+  // Example 3: both: adds 1/2 to the 3 Hz sinewave:
   let sinewave = M$.Osc({ t: M$.sine, f: 600,
-                          g: [M$.Osc({ t: M$.sine, f: 30 }), M$.C(1/2)] })
-  // Example 3b: Set the final gain to be positive by scaling the 30 Hz
+                          g: [M$.Osc({ t: M$.sine, f: 3 }), M$.C(1/2)] })
+  // Example 3b: Set the final gain to be positive by scaling the 3 Hz
   // sinewave to 1/2 and biasing by adding a constant 1/2 to that:
   let sinewave = M$.Osc({ t: M$.sine, f: 600,
-                          g: [M$.Osc({t: M$.sine, f: 30, g: 1/2}), M$.C(1/2)] })
+                          g: [M$.Osc({t: M$.sine, f: 3, g: 1/2}), M$.C(1/2)] })
   // Example 3c: A clearer way to write that:
-  let tremolo = M$.Osc({ t: M$.sine, f: 30, g: 1/2 })
+  let tremolo = M$.Osc({ t: M$.sine, f: 3, g: 1/2 })
   let sinewave = M$.Osc({ t: M$.sine, f: 600, g: [tremolo, M$.C(1/2)] })
   ```
-* All of these parameters can be set to have dynamically varying scalar values as input. If these parameters already have modules set as inputs, then the scalars are added as offsets to those existing inputs:
+* If patchable parameters already have modules set as inputs, then subsequent patches are added to those existing inputs:
   ```javascript
-  let signal = M$.C(1),
+  let voltage = M$.C(1),
       sinewave = M$.Osc({ t: M$.sine, f: 100, g: 1/4 }),
-      biasedGain = M$.Gain({ g: sinewave, r$: signal })
+      biasedGain = M$.Gain({ g: sinewave, r$: voltage })
   biasedGain.g.r$(M$.C(1/2));
   // biasedGain will now vary between 1/4 and 3/4.
   // Note also this would produce the same effect:
-  biasedGain = M$.Gain({ g: [sinewave, M$.C(1/2)], r$: signal });
+  biasedGain = M$.Gain({ g: [sinewave, M$.C(1/2)], r$: voltage });
   ```
 
 Other esoteric details:
 
-* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can take the string literal (e.g. `'sine'`), take the M$ convenience attribute (e.g. `M$.sine`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Cheat Sheet](cheatsheet.md) for more info.
+* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can take a string literal for the corresponding AudioNode (e.g. `'sine'`), take the M$ convenience attribute (e.g. `M$.sine`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Cheat Sheet](cheatsheet.md) for more info.
   ```javascript
   // String:
   let sinewave = M$.Osc({ t: 'sine', f: 100, g: 1/4 })
@@ -90,7 +93,7 @@ Other esoteric details:
   let sinewave = M$.Osc({ t: 1, f: 100, g: 1/4 })
   ```
 * The Distorter `M$.Dist` module takes an `a` parameter for "amount". It can range from -2.9 to 100 or beyond. Values below 0 map to an exponential curve where low audio values are quieted, and values above 0 map to a sigmoid where low audio values are amplified.
-* Outs are usually emerging from a gain AudioNode, and are accessible by the `.z` property if need be.
+* A module's main audio output is usually emerging from a gain AudioNode that's accessible by the `.z` attribute if need be.
 * If you want to route the output of a MinuteSynth module to a WebAudio node input, you can use the `connect()` method on the module's output:
   ```javascript
   // Let's say we have an "analyser" object from WebAudio.
@@ -100,7 +103,7 @@ Other esoteric details:
 
 ## The Voice Module
 
-The `M$.Voice` module is a special module that represents the connection to the final output, which by default is the web browser's sound output. A couple extra features allow for default frequency control, and triggering of modules on/off.
+The `M$.Voice` module is a special module that represents the connection to the final output, which by default is the web browser's sound output. A couple extra features allow for default frequency control (available through the `f` attribute), and triggering of modules on/off.
 
 As a first example, the code snippet below would allow for a sound to be emitted indefinitely. Also, this would allow the voice's built-in frequency controller to control the oscillator.
 
@@ -193,22 +196,3 @@ Controls include:
 | `z0()` | Sets value to 0 |
 
 These types of controls are available for most scalar parameters in MinuteSynth, including `M$.C` constants.
-
-## The Voice Module
-
-The Voice module automatically connects to the AudioContext's destination, and contains a frequency controller (accessible through `.f`, and distributes triggered when its `.on()` and `.off()`) methods are called. It also has a gain AudioNode that can control the volume for everything that is output.
-
-## ADSR Basics
-
-The ADSR (`U.A({}, voice)`) takes attack/decay/sustain/release values for use of automatically controlling an input parameter over time. It is important to attach the "voice" object to it, as that will allow the ADSR to be triggered by the "voice".
-
-The default ADSR lets the tone stay on until it is shut off. These are the values that can be set:
-
-* D: start delay for attack
-* b: base value (= "off" value)
-* e: attack arrival value
-* a: attack time (time to go from b to e)
-* d: decay time (time to go from e to s)
-* s: sustain value (after the attack-decay sequence
-* r: release time (from s to b, occurring when off() is called)
-* p: auto-pulse-- if nonzero, automatically does an off() p seconds after on().
