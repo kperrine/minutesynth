@@ -15,7 +15,16 @@ const ToneDefs = {
   basicTone: {
     fn: M$ => {
       // Demonstrates creation of ADSR control on a simple tone
+      const voice = M$.Voice()
 
+      // Create ADSR and patch voice trigger into it:
+      const adsr = M$.ADSR({ a: 0.5, d: 0.5, s: 0.5, r: 2 }, voice)
+      
+      // Finish up, using the Voice's frequency generator attribute:
+      const osc = M$.Osc({ t: M$.square, f: voice.f, g: adsr })
+      osc.$(voice)
+
+      return voice
     },
     freq: 440,
     rec: 4,
@@ -24,7 +33,29 @@ const ToneDefs = {
   basicFM: {
     fn: M$ => {
       // Demonstrates FM synthesis
-
+      const voice = M$.Voice(),
+            sinewave = M$.Osc({ t: M$.sine, f: voice.f }),
+            fourFifthFreq = M$.Gain({ g: 4/5, r$: voice.f }),
+            squareADSR = M$.ADSR({ p: 0.05, r: 1 }, voice), // Pulse
+            squarewave = M$.Osc({ t: M$.square, f: fourFifthFreq, g: squareADSR }),
+            multResult = M$.Gain({ g: sinewave, r$: squarewave })
+      multResult.$(voice)
+      return voice
+    },
+    freq: 440,
+    rec: 4,
+    off: 3
+  },
+  basicFilter: {
+    fn: M$ => {
+      var voice = M$.Voice(),
+          noise = M$.Noise(),
+          filter = M$.Filt( {t: M$.bandpass, q: 10, f: voice.f })
+          adsr = M$.ADSR({}, voice) // Default on/off, triggered
+      noise.$(filter)
+      filter.$(voice)
+      voice.g.r$(adsr) // Master voice control
+      return voice
     },
     freq: 440,
     rec: 4,
@@ -212,7 +243,7 @@ const ToneDefs = {
       const filter = M$.Filt({ t: 'highpass', f: [fADSR, lfo2], q: 1, r$: [osc1, osc1b, osc2] })
       const padADSR = M$.ADSR({ a: 1.5, d: 0, s: 1.5, r: 1.3 }, voice)
       const amp = M$.Gain({ g: padADSR, r$: filter })
-      const reverb = M$.K({ b: M$.sr(0.1, 1, 0.95), r$: amp, g: 2 })
+      const reverb = M$.Conv({ b: M$.sr(0.1, 1, 0.95), r$: amp, g: 2 })
       reverb.$(voice)
       return voice
     },

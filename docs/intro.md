@@ -186,8 +186,8 @@ voice.$(adsr)
 // ...or Approach 3: Explicit rg() "register" method call on Voice:
 voice.rg(adsr)
 
-// Finish up, using the Voice's frequency generator attribute, start silent:
-const osc = M$.Osc({ t: M$.square, f: voice.f, g: adsr, s: -1 })
+// Finish up, using the Voice's frequency generator attribute:
+const osc = M$.Osc({ t: M$.square, f: voice.f, g: adsr })
 osc.$(voice)
 
 // Play a note:

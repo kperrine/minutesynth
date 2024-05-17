@@ -113,7 +113,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // Noise produces a playable buffer of noise.
   // Params: g: gain; s: start time
   Noise({ g = 1, s = 0, r, d } = {}) {
-    let module = U.B({T: U._NOISE_LEN, g, s, r, d, n: 0}),
+    let module = U.Buf({T: U._NOISE_LEN, g, s, r, d, n: 0}),
         data = module.x(0),
         i;
 		for (i = 0; i < module.N; i++) {
@@ -128,7 +128,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   //         Also: W: samples
   Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
-    let module = U.B({T: W / U.SR, S, f, g, s, n: 1}),
+    let module = U.Buf({T: W / U.SR, S, f, g, s, n: 1}),
         data = module.x(0),
         bias = 0.5 - w,
         i;
