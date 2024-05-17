@@ -109,8 +109,3 @@ function downloadBlob(blob, filename) {
   // in order to attach it to the DOM or use it in some other way
   return a
 }
-
-function render(voiceName, voiceCode, sampleRate, recordLen, noteFreq, noteOff) {
-    let voiceFunc = prepVoiceFunc(voiceCode)
-    record8(voiceName, voiceFunc, sampleRate, recordLen, noteFreq, noteOff, _makeLink)
-}

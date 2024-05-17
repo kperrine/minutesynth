@@ -42,9 +42,9 @@ const ToneDefs = {
   basicPortamento: {
     fn: m$ => {
       // Demonstration using a frequency controller to create a "sliding" effect
-      let voice = M$.Voice(),
-          adsr = M$.ADSR({}, voice),
-          osc1 = M$.Osc({ t: M$.triangle, f: voice.f, g: adsr })
+      let voice = m$.Voice(),
+          adsr = m$.ADSR({}, voice),
+          osc1 = m$.Osc({ t: m$.triangle, f: voice.f, g: adsr })
       voice.f.p.r$(1/2) // Set portamento to be a half-second
       osc1.$(voice)
       return voice

@@ -112,12 +112,58 @@
     <script>
 "use strict";
 
+const MIDDLE_C = 263 // Can change for tuning
 const MAPPING = {cN: 0, cS: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
     gN: 7, gS: 8, aN: 9, aS: 10, bN: 11, cH: 12
 }
 
 let currentID = ""
 let activeID = ""
+let m$
+let keyVoice
+
+function clearKeyVoice() {
+    if (keyVoice) {
+        keyVoice.del()
+    }
+    keyVoice = undefined
+}
+
+function checkKeyVoice() {
+    if (keyVoice) {
+        if ((!('on' in keyVoice)) || (!('off' in keyVoice))) {
+            console.log("ERROR: The code block is not returning a M$.Voice module.")
+            alert("The code block doesn't return a M$.Voice module.")
+            keyVoice = undefined
+        }
+    }    
+}
+
+function createKeyVoice() {
+    const snippet = document.getElementById("snippet").value
+    const voiceFunc = prepVoiceFunc(snippet)
+    clearKeyVoice()
+    if (voiceFunc) {
+        keyVoice = voiceFunc(m$)
+        checkKeyVoice()
+    }
+}
+
+function playKey(offset) {
+    if (!keyVoice) {
+        createKeyVoice()
+    }
+    if (keyVoice) {
+        const octave = document.getElementById("octave").value
+        keyVoice.on(m$.now(), MIDDLE_C * (2**(((octave - 4) * 12 + offset) / 12)))
+    }
+}
+
+function offKey() {
+    if (keyVoice) {
+        keyVoice.off(m$.now())
+    }
+}
 
 function highlightKey(keyID, activate) {
     if (!(keyID in MAPPING)) {
@@ -159,6 +205,7 @@ function keyZoneMovement(event) {
 function pressAction(event) {
     if (currentID !== "") {
         console.log(`Activating Key: ${MAPPING[currentID]}`)
+        playKey(MAPPING[currentID])
         highlightKey(currentID, true)
         activeID = currentID
     }
@@ -166,6 +213,7 @@ function pressAction(event) {
 function releaseAction(event) {
     if (activeID !== "") {
         console.log(`Deactivating Key: ${MAPPING[activeID]}`)
+        offKey()
         highlightKey(activeID, false)
         activeID = ""
     }        
@@ -182,43 +230,41 @@ function showRecording() {
     document.getElementById("keyPanel").style.visibility = 'hidden'
     document.getElementById("recordPanel").style.visibility = 'visible'
 }
+
 function prepVoiceFunc(snippet) {
-  let voiceFunc = new Function('U', snippet);
-  return voiceFunc;
+    let voiceFunc = new Function('M$', snippet)
+    if (!voiceFunc) {
+        console.out("ERROR: There was a problem in parsing the function.")
+        alert("There was a problem in parsing the function.")
+    }
+    return voiceFunc
+}
+function render(voiceName, voiceCode, sampleRate, recordLen, noteFreq, noteOff) {
+    const voiceFunc = prepVoiceFunc(voiceCode)
+    if (voiceFunc) {
+        record8(voiceName, voiceFunc, sampleRate, recordLen, noteFreq, noteOff, _makeLink)
+    }
 }
 
-function play() {
-  if (!U) {
-    init();
-  }
+function recPlay() {
+    if (!m$) {
+        synthInit();
+    }
 
-  let voiceName = document.getElementById("voiceName").value;
-  voiceName = voiceName ? voiceName : "voice";
-  let snippet = document.getElementById("snippet").value;
-  let noteOff = document.getElementById("noteOff").value;
-  noteOff = noteOff ? Number(noteOff) : 1;
-  let noteFreq = document.getElementById("noteFreq").value;
-  noteFreq = noteFreq ? Number(noteFreq) : 440;
-  let sampleRate = document.getElementById("sampleRate").value;
-  sampleRate = sampleRate ? Number(sampleRate) : 27928;
-  let recordLen = document.getElementById("recordLen").value;
-  recordLen = recordLen ? Number(recordLen) : 3.95;
+    let voiceName = document.getElementById("voiceName").value;
+    voiceName = voiceName ? voiceName : "voice";
+    let snippet = document.getElementById("snippet").value;
+    let noteOff = document.getElementById("noteOff").value;
+    noteOff = noteOff ? Number(noteOff) : 1;
+    let noteFreq = document.getElementById("noteFreq").value;
+    noteFreq = noteFreq ? Number(noteFreq) : 440;
+    let sampleRate = document.getElementById("sampleRate").value;
+    sampleRate = sampleRate ? Number(sampleRate) : 27928;
+    let recordLen = document.getElementById("recordLen").value;
+    recordLen = recordLen ? Number(recordLen) : 3.95;
 
-  /*
-  // TODO: Connect buffer playback to Analyzer
-  voice.z.connect(analyser);
-
-  let now = U.now();
-  voice.off(now);
-  voice.on(now, noteFreq);
-  voice.off(now + noteOff);
-
-  // Set timeout after x seconds & kill the object:
-  setTimeout(() => voice.del(), recordLen * 1000);
-  */
-
-  // Render the voice out to time duration:
-  render(voiceName, snippet, sampleRate, recordLen, noteFreq, noteOff);
+    // Render the voice out to time duration:
+    render(voiceName, snippet, sampleRate, recordLen, noteFreq, noteOff);
 }
 
 function init() {
@@ -229,16 +275,19 @@ function init() {
     document.addEventListener('touchstart', pressAction)
     document.addEventListener('touchend', releaseAction)
     document.addEventListener('touchcancel', releaseAction)
+    document.addEventListener("change", clearKeyVoice)
+}
 
-    U = USynth();
-    analyser = U.ac.createAnalyser();
+function synthInit() {
+    m$ = M$();
+    analyser = m$.ac.createAnalyser();
     analyser.minDecibels = -90;
     analyser.maxDecibels = -10;
     analyser.smoothingTimeConstant = 0.65;
 
-    var canvas = document.querySelector('.visualizer');
-    var canvasCtx = canvas.getContext("2d");
-    var intendedWidth = document.querySelector('.wrapper').clientWidth;
+    let canvas = document.querySelector('.visualizer');
+    let canvasCtx = canvas.getContext("2d");
+    let intendedWidth = document.querySelector('.wrapper').clientWidth;
     canvas.setAttribute('width', intendedWidth);
 
     function visualizeFreq() {
@@ -356,6 +405,7 @@ function presetLoad() {
     document.getElementById("noteFreq").value = ToneDefs[toneName].freq ? ("" + ToneDefs[toneName].freq) : "440";
     document.getElementById("sampleRate").value = ToneDefs[toneName].sr ? ("" + ToneDefs[toneName].sr) : "27928";
     document.getElementById("recordLen").value = ToneDefs[toneName].rec ? ("" + ToneDefs[toneName].rec) : "2.34";
+    clearKeyVoice()
   }
 }
 
@@ -376,51 +426,54 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="wrapper">
         <canvas class="visualizer" width="640" height="100"></canvas>
         <div>
-        This plays back and does raw file rendering for a USynth Voice. Paste code in that returns a USynth "V" (Voice) object.<br>
+        Write a synth definition. Parameter M$ is the MinuteSynth object, and code must return a M$.Voice module.<br>
         <textarea id="snippet" rows="16" cols="120">
         </textarea>
-        <table>
-          <tr><td colspan=2><b>Parameters:</b></td></tr>
-          <tr><td><label for="presetBox">tonedef.js preset:</label></td><td><select id="presetBox" onchange="presetLoad()"></select></td></tr>
-          <tr><td><label for="voiceName">Voice name:</label></td><td><input type="text" id="voiceName" value="voice"></td></tr>
-          <tr><td><label for="noteOff">Note off time:</label></td><td><input type="text" id="noteOff" value="1.0"></td></tr>
-          <tr><td><label for="noteFreq">Note frequency:</label></td><td><input type="text" id="noteFreq" value="440"> (A3=440)</td></tr>
-          <tr><td><label for="sampleRate">Sample rate:</label></td><td><input type="text" id="sampleRate" value="27928"> (PAL=16574)</td></tr>
-          <tr><td><label for="recordLen">Record length:</label></td><td><input type="text" id="recordLen" value="2.34"> (64K for PAL=3.95)</td></tr>
-        </table>
-        <!-- TODO: Drop-down that picks from presets in tonedef.js: ToneDefs -->
-        </div>
-        <button onclick="play()">Play and Render</button><br>
-        <div id="exportLink"></div>
-      <div>
+    <div>
+    <p>
+        <label for="presetBox">tonedef.js preset:</label>
+        <select id="presetBox" onchange="presetLoad()"></select>
+    </p>
     
-
-<button id="showKeyboard" onclick="showKeyboard();" disabled>Keyboard</button>
-<button id="showRecording" onclick="showRecording();">Recording</button>
-<div class="tabPanel">
-<div id="recordPanel">
-Stuff.
-</div>
-<div id="keyPanel">
-<div class="keyBorder"><div class="keyArea">
-    <div class="whiteKey" id="cN"></div>
-    <div class="blackKey" id="cS"></div>
-    <div class="whiteKey" id="dN"></div>
-    <div class="blackKey" id="dS"></div>
-    <div class="whiteKey" id="eN"></div>
-    <div class="whiteKey" id="fN"></div>
-    <div class="blackKey" id="fS"></div>
-    <div class="whiteKey" id="gN"></div>
-    <div class="blackKey" id="gS"></div>
-    <div class="whiteKey" id="aN"></div>
-    <div class="blackKey" id="aS"></div>
-    <div class="whiteKey" id="bN"></div>
-    <div class="whiteKey" id="cH"></div>
-</div></div>
-<label for="octave">Octave: </label>
-<input type="number" id="octave" min="0" max="9" maxlength="1" value="3" />
-</div>
-</div>
-
+    <button id="showKeyboard" onclick="showKeyboard();" disabled>Keyboard</button>
+    <button id="showRecording" onclick="showRecording();">Recording</button>
+    <div class="tabPanel">
+        <div id="recordPanel">
+            <table>
+                <tr><td colspan=2><b>Record Parameters:</b></td></tr>
+                <tr><td><label for="voiceName">Voice name:</label></td>
+                    <td><input type="text" id="voiceName" value="voice"></td></tr>
+                <tr><td><label for="noteOff">Note off time:</label></td>
+                    <td><input type="text" id="noteOff" value="1.0"></td></tr>
+                <tr><td><label for="noteFreq">Note frequency:</label></td>
+                    <td><input type="text" id="noteFreq" value="440"> (A3=440)</td></tr>
+                <tr><td><label for="sampleRate">Sample rate:</label></td>
+                    <td><input type="text" id="sampleRate" value="27928"> (PAL=16574)</td></tr>
+                <tr><td><label for="recordLen">Record length:</label></td>
+                    <td><input type="text" id="recordLen" value="2.34"> (64K for PAL=3.95)</td></tr>
+            </table>
+            <button onclick="recPlay()">Play and Render</button><br>
+            <div id="exportLink"></div>
+        </div>
+        <div id="keyPanel">
+        <div class="keyBorder"><div class="keyArea">
+            <div class="whiteKey" id="cN"></div>
+            <div class="blackKey" id="cS"></div>
+            <div class="whiteKey" id="dN"></div>
+            <div class="blackKey" id="dS"></div>
+            <div class="whiteKey" id="eN"></div>
+            <div class="whiteKey" id="fN"></div>
+            <div class="blackKey" id="fS"></div>
+            <div class="whiteKey" id="gN"></div>
+            <div class="blackKey" id="gS"></div>
+            <div class="whiteKey" id="aN"></div>
+            <div class="blackKey" id="aS"></div>
+            <div class="whiteKey" id="bN"></div>
+            <div class="whiteKey" id="cH"></div>
+        </div></div>
+        <label for="octave">Octave: </label>
+        <input type="number" id="octave" min="0" max="9" maxlength="1" value="4" />
+        </div>
+    </div>
 </body>
 </html>

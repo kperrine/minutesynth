@@ -10,6 +10,8 @@ MinuteSynth is comprised of a number of modules that have a common interface for
 
 ![Module Structure](img/module_struct.png)
 
+Most modules are comprised of some kind of WebAudio AudioNode followed by a GainNode. Patches of upstream constants or audio streams may be made for the input and patchable parameters. There are sometimes other non-patchable parameters ("scalars") that are only set once upon module instanciation. Finally, the output can be patched in one or more places downstream.
+
 The next section explains further.
 
 ## Semantics
@@ -21,10 +23,10 @@ Most of the modules follow these patterns:
   // Create a sinewave with a fixed frequency of 600 Hz
   let myOscillator = M$.Osc({ t: M$.sine, f: 600 })
   ```
-  * Some parameters may be patchable, optionally able to receive upstream modules (`f:` in the example can do this), while other parameters are preset scalars that never change.
+  * Some parameters may be patchable, optionally able to receive upstream modules (`f:` in the example can do this), while other parameters are preset scalars that never change (e.g. `t:`).
 * Main audio patches between upstream and downstream modules can be made:
   * Forward patch: `.$()` method
-  * Reverse patch `.r$()` method, and also `r$` parameter upon instanciation.
+  * Reverse patch `.r$()` method, and also `r$:` parameter upon instanciation.
   ```javascript
   source.$(destination) // <-- Forward patch
   destination.r$(source) // <-- Reverse patch
@@ -50,7 +52,7 @@ Most of the modules follow these patterns:
   ```
 * The `M$.Gain` module will multiply patches together:
   ```javascript
-  let multResult = M$.Gain({ g: sinewave, r$ squarewave })
+  let multResult = M$.Gain({ g: sinewave, r$: squarewave })
   voice.r$(multResult)
   ```
 * Patchable parameters can take a constant scalar as an input, a module as an input, or an array. If you want to have a scalar in an array, you'll need to create a `M$.C` (Constant) module for it.
@@ -149,15 +151,15 @@ osc2.s.no(now + 4)
 
 This causes osc1 to go after a 1-second delay, osc2 to start a second after that, and for oscillators to stop 2 seconds later each.
 
-Oscillators, Noise, and Buffer (`O`, `N`, and `B`) all have a scalar "start" parameter `s` that tells the respective AudioNode objects to start at specific times. If `s` is undefined, then the start happens immediately. If it is -1, then they won't start until the `.go()` method is called.
+Oscillators, Noise, and Buffer (`M$.Osc`, `M$.Noise`, and `M$.Buf`) all have a non-patchable scalar "start" parameter `s` that tells the respective AudioNode objects to start at specific times. If `s` is undefined, then the start happens immediately. If it is `-1`, then they won't start until the `.go()` method is called.
 
 ### ADSR Controls
 
-It is also possible to linearly control the gain nodes that are bundled with each oscillator (or similarly control almost any parameter, for that matter). One model commonly used to change controls is "ADSR", or "Attack, Decay, Sustain, Release". The ADSR control has a series of parameters, illustrated in this figure:
+It is also possible to linearly control the gain nodes that are bundled with each oscillator (or similarly control almost any parameter, for that matter). One model commonly used to change controls is "ADSR", or "Attack, Decay, Sustain, Release". The ADSR control has a series of scalar parameters, illustrated in this figure:
 
 ![ADSR illustration](img/adsr_curve.png)
 
-| Varibale | Meaning | Default |
+| Scalar | Meaning | Default |
 |-|-|-|
 | D | Start delay (sec) | 0 |
 | b | Base value (value of "off") | 0 |
@@ -169,6 +171,29 @@ It is also possible to linearly control the gain nodes that are bundled with eac
 | p | Auto-pulse (if nonzero, time to automatically triggerOff) | 0 |
 
 > **Trick:** It is possible to invert the ADSR curve by setting b > e or b > s.
+
+The ADSR module is especially useful when it is patched to a Voice trigger output, as that controls when the curve begins and when it enters into the release phase. Such a patch can appear like this:
+
+```javascript
+const voice = M$.Voice()
+
+// Approach 1: Second ADSR parameter
+const adsr = M$.ADSR({ a: 0.5, d: 0.5, s: 0.7, r: 2 }, voice)
+
+// ...or Approach 2: Voice forward special trigger patch:
+voice.$(adsr)
+
+// ...or Approach 3: Explicit rg() "register" method call on Voice:
+voice.rg(adsr)
+
+// Finish up, using the Voice's frequency generator attribute, start silent:
+const osc = M$.Osc({ t: M$.square, f: voice.f, g: adsr, s: -1 })
+osc.$(voice)
+
+// Play a note:
+voice.on(M$.now(), 600)
+voice.off(M$.now() + 2)
+```
 
 ### Lower Level Controls
 
