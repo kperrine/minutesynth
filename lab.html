@@ -120,6 +120,7 @@ const MAPPING = {cN: 0, cS: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
 let currentID = ""
 let activeID = ""
 let m$
+let analyser
 let keyVoice
 
 function clearKeyVoice() {
@@ -150,6 +151,9 @@ function createKeyVoice() {
 }
 
 function playKey(offset) {
+    if (!m$) {
+        synthInit()
+    }
     if (!keyVoice) {
         createKeyVoice()
     }

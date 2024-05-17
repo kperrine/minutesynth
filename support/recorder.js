@@ -35,16 +35,16 @@ function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, not
   
 function _makeLink(samples, voiceName, buf, sampleRate, dur) {
   // Provide buffer for playback and play it:
-  let playBuf = U.ac.createBuffer(1, ~~(sampleRate * dur), 27928/*sampleRate*/)
+  let playBuf = m$.ac.createBuffer(1, ~~(sampleRate * dur), 27928/*sampleRate*/)
   let srcData = buf.getChannelData(0)
   let data = playBuf.getChannelData(0)
   for (let i = 0; i < data.length; i++) {
     data[i] = srcData[i]
   }
-  let playBufNode = U.ac.createBufferSource()
+  let playBufNode = m$.ac.createBufferSource()
   playBufNode.buffer = playBuf
   playBufNode.loop = false
-  playBufNode.connect(U.ac.destination)
+  playBufNode.connect(m$.ac.destination)
   playBufNode.connect(analyser) // Connect playback to analyzer. Not with a "z".
   playBufNode.start()
 
