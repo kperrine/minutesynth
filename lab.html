@@ -437,9 +437,29 @@ function formatCode(snippet) {
     const first = snippet.indexOf('{')
     const last = snippet.lastIndexOf('}')
     snippet = snippet.substr(first + 1, last - first - 1)
-
-
-    return snippet
+    const lines = snippet.split('\n')
+    let newBuf = ""
+    if (lines) {
+        while(lines.length && lines[0].trim().length == 0) {
+            lines.shift()
+        }
+        if (lines.length) {
+            const indent = lines[0].search(/\S|$/)
+            for (let line of lines) {
+                if (newBuf.length > 0) {
+                    newBuf += '\n'
+                }
+                let buf = line.slice(indent)
+                if (line.slice(line.search(/\S|$/)).length > buf.length) {
+                    newBuf += line.trim()
+                }
+                else {
+                    newBuf += buf
+                }
+            }
+        }
+    }
+    return newBuf
  }
 
 function presetLoad() {
