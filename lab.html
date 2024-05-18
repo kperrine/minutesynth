@@ -132,7 +132,7 @@ function clearKeyVoice() {
 
 function checkKeyVoice() {
     if (keyVoice) {
-        if ((!('on' in keyVoice)) || (!('off' in keyVoice))) {
+        if (!(keyVoice.on && keyVoice.off && keyVoice.z)) {
             console.log("ERROR: The code block is not returning a M$.Voice module.")
             alert("The code block doesn't return a M$.Voice module.")
             keyVoice = undefined
@@ -151,21 +151,28 @@ function createKeyVoice() {
 }
 
 function playKey(offset) {
+    console.log(`Activating Key: ${offset}`)
     if (!m$) {
         synthInit()
     }
     if (!keyVoice) {
         createKeyVoice()
+        if (keyVoice) {
+            keyVoice.z.connect(analyser)
+        }
     }
     if (keyVoice) {
         const octave = document.getElementById("octave").value
-        keyVoice.on(m$.now(), MIDDLE_C * (2**(((octave - 4) * 12 + offset) / 12)))
+        keyVoice.on(0, MIDDLE_C * (2**(((octave - 4) * 12 + offset) / 12)))
     }
 }
 
 function offKey() {
+    if (activeID in MAPPING) {
+        console.log(`Deactivating Key: ${MAPPING[activeID]}`)
+    }
     if (keyVoice) {
-        keyVoice.off(m$.now())
+        keyVoice.off()
     }
 }
 
@@ -199,16 +206,15 @@ function keyZoneMovement(event) {
     }
     if (currentID !== "") {
         if (activeID !== "" && activeID != currentID) {
-            console.log(`Activating Key: ${MAPPING[currentID]}`)
             highlightKey(activeID, false)
             highlightKey(currentID, true)
+            playKey(MAPPING[currentID])
             activeID = currentID
         }
     }
 }
 function pressAction(event) {
     if (currentID !== "") {
-        console.log(`Activating Key: ${MAPPING[currentID]}`)
         playKey(MAPPING[currentID])
         highlightKey(currentID, true)
         activeID = currentID
@@ -216,7 +222,6 @@ function pressAction(event) {
 }
 function releaseAction(event) {
     if (activeID !== "") {
-        console.log(`Deactivating Key: ${MAPPING[activeID]}`)
         offKey()
         highlightKey(activeID, false)
         activeID = ""
@@ -279,7 +284,7 @@ function init() {
     document.addEventListener('touchstart', pressAction)
     document.addEventListener('touchend', releaseAction)
     document.addEventListener('touchcancel', releaseAction)
-    document.addEventListener("change", clearKeyVoice)
+    document.getElementById("snippet").addEventListener("change", clearKeyVoice)
 }
 
 function synthInit() {
@@ -439,8 +444,9 @@ document.addEventListener('DOMContentLoaded', function() {
         <select id="presetBox" onchange="presetLoad()"></select>
     </p>
     
-    <button id="showKeyboard" onclick="showKeyboard();" disabled>Keyboard</button>
-    <button id="showRecording" onclick="showRecording();">Recording</button>
+    <button id="showKeyboard" onclick="showKeyboard();" disabled>Show Keyboard</button>
+    <button id="showRecording" onclick="showRecording();">Show Recording</button>
+    <hr /> 
     <div class="tabPanel">
         <div id="recordPanel">
             <table>

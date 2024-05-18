@@ -377,11 +377,13 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
 
       // This will call on() for all Modules registered.
       on(onTime, freq) {
+        !onTime && (onTime = U.now())
         this._modules.forEach(module => module.on && module.on(onTime, freq));
       },
 
       // This will call off() for all Modules registered.
       off(offTime) {
+        !offTime && (offTime = U.now())
         this._modules.forEach(module => module.off && module.off(offTime));
       },
     };
@@ -419,7 +421,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
       /*
       this.outParams.push(param);
       */
-      return this; // Allows chaining of commands
+      return tgtThing; // Allows chaining of commands
     },
 
     // r$ is a "reverse attach", which will allow one or more source modules to attach to this module:

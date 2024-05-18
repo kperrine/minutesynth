@@ -10,7 +10,7 @@ MinuteSynth is comprised of a number of modules that have a common interface for
 
 ![Module Structure](img/module_struct.png)
 
-Most modules are comprised of some kind of WebAudio AudioNode followed by a GainNode. Patches of upstream constants or audio streams may be made for the input and patchable parameters. There are sometimes other non-patchable parameters ("scalars") that are only set once upon module instanciation. Finally, the output can be patched in one or more places downstream.
+Most modules are comprised of some kind of WebAudio AudioNode followed by a GainNode. Patches of upstream constants or audio streams may be made for the input and patchable parameters. There are sometimes other non-patchable parameters ("scalars") that are only set once upon module instanciation or by direct assignment. Finally, the output can be patched in one or more places downstream.
 
 The next section explains further.
 
@@ -96,6 +96,7 @@ Other esoteric details:
   ```
 * The Distorter `M$.Dist` module takes an `a` parameter for "amount". It can range from -2.9 to 100 or beyond. Values below 0 map to an exponential curve where low audio values are quieted, and values above 0 map to a sigmoid where low audio values are amplified.
 * A module's main audio output is usually emerging from a gain AudioNode that's accessible by the `.z` attribute if need be.
+* The `M$.Voice` module has `.on(startTime, freq)` and `.off(stopTime)` methods. In these, use `0` or `undefined` for the time parameters to utilize `M$.now()`.
 * If you want to route the output of a MinuteSynth module to a WebAudio node input, you can use the `connect()` method on the module's output:
   ```javascript
   // Let's say we have an "analyser" object from WebAudio.
@@ -197,7 +198,7 @@ voice.off(M$.now() + 2)
 
 ### Lower Level Controls
 
-The WebAudio value controls are also made available. This is an example of using:
+The WebAudio value controls are also made available for patchable parameters. This is an example of using:
 
 ```javascript
 osc1.g.vT(1, now + 1)
@@ -220,4 +221,4 @@ Controls include:
 | `h(holdTime)` | Cancels scheduled events after the given time, and holds the value constant at that time |
 | `z0()` | Sets value to 0 |
 
-These types of controls are available for most scalar parameters in MinuteSynth, including `M$.C` constants.
+These types of controls are available for most patchable parameters in MinuteSynth, including `M$.C` constants. Note that for non-patchable scalar parameters (e.g. `M$.Freq`'s `.p` attribute) you can set by assignment (e.g. `freq.p = 0.5`).
