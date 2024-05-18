@@ -122,11 +122,28 @@ let activeID = ""
 let m$
 let analyser
 let keyVoice
+let codeCache = ""
+
+function showError(exc) {
+    let errMsg = exc
+    if (exc.message && exc.stack) {
+        let stackLines = exc.stack.split('\n')
+        for (let line of stackLines) {
+            const matches = line.match(/(\d+):(\d+)/g)
+            if (matches && matches.length >= 1) {
+                errMsg = `${exc.message} (${matches[matches.length - 1]})`
+                break
+            }
+        }
+    }
+    alert(errMsg)
+}
 
 function clearKeyVoice() {
-    if (keyVoice) {
+    if (keyVoice && keyVoice.del) {
         keyVoice.del()
     }
+    releaseAction()
     keyVoice = undefined
 }
 
@@ -135,7 +152,7 @@ function checkKeyVoice() {
         if (!(keyVoice.on && keyVoice.off && keyVoice.z)) {
             console.log("ERROR: The code block is not returning a M$.Voice module.")
             alert("The code block doesn't return a M$.Voice module.")
-            keyVoice = undefined
+            clearKeyVoice()
         }
     }    
 }
@@ -145,8 +162,15 @@ function createKeyVoice() {
     const voiceFunc = prepVoiceFunc(snippet)
     clearKeyVoice()
     if (voiceFunc) {
-        keyVoice = voiceFunc(m$)
-        checkKeyVoice()
+        try {
+            keyVoice = voiceFunc(m$)
+            checkKeyVoice()
+        }
+        catch (exc) {
+            console.log("ERROR: Function running: " + exc)
+            showError(exc)
+            clearKeyVoice()
+        }
     }
 }
 
@@ -207,23 +231,29 @@ function keyZoneMovement(event) {
     if (currentID !== "") {
         if (activeID !== "" && activeID != currentID) {
             highlightKey(activeID, false)
-            highlightKey(currentID, true)
-            playKey(MAPPING[currentID])
-            activeID = currentID
+            pressAction(event)
         }
     }
 }
 function pressAction(event) {
+    // Detect if code has changed. (Change event executes in wrong order.)
+    if (codeCache !== document.getElementById("snippet").value) {
+        clearKeyVoice()
+    }
+    codeCache = document.getElementById("snippet").value
+
     if (currentID !== "") {
         playKey(MAPPING[currentID])
-        highlightKey(currentID, true)
-        activeID = currentID
+        if (keyVoice) {
+            highlightKey(currentID, true)
+            activeID = currentID
+        }
     }
 }
 function releaseAction(event) {
     if (activeID !== "") {
-        offKey()
         highlightKey(activeID, false)
+        offKey()
         activeID = ""
     }        
 }
@@ -241,10 +271,13 @@ function showRecording() {
 }
 
 function prepVoiceFunc(snippet) {
-    let voiceFunc = new Function('M$', snippet)
-    if (!voiceFunc) {
-        console.out("ERROR: There was a problem in parsing the function.")
-        alert("There was a problem in parsing the function.")
+    let voiceFunc
+    try {
+        voiceFunc = new Function('M$', snippet)
+    }
+    catch (exc) {
+        console.log("ERROR: Function parsing: " + exc)
+        showError(exc)
     }
     return voiceFunc
 }
@@ -284,7 +317,7 @@ function init() {
     document.addEventListener('touchstart', pressAction)
     document.addEventListener('touchend', releaseAction)
     document.addEventListener('touchcancel', releaseAction)
-    document.getElementById("snippet").addEventListener("change", clearKeyVoice)
+    //document.getElementById("snippet").addEventListener("change", clearKeyVoice)
 }
 
 function synthInit() {
@@ -400,34 +433,40 @@ function synthInit() {
     visualizeTime();
 }
 
+function formatCode(snippet) {
+    const first = snippet.indexOf('{')
+    const last = snippet.lastIndexOf('}')
+    snippet = snippet.substr(first + 1, last - first - 1)
+
+
+    return snippet
+ }
+
 function presetLoad() {
-  let box = document.getElementById("presetBox");
-  if (box.selectedIndex >= 0) {
-    let toneName = box.options[box.selectedIndex].value;
-    let ourFn = ToneDefs[toneName].fn.toString();
-    let first = ourFn.indexOf('{');
-    let last = ourFn.lastIndexOf('}');
-    ourFn = ourFn.substr(first + 1, last - first - 1);
-    document.getElementById("voiceName").value = toneName;
-    document.getElementById("snippet").value = ourFn;
-    document.getElementById("noteOff").value = ToneDefs[toneName].off ? ("" + ToneDefs[toneName].off) : "1.0";
-    document.getElementById("noteFreq").value = ToneDefs[toneName].freq ? ("" + ToneDefs[toneName].freq) : "440";
-    document.getElementById("sampleRate").value = ToneDefs[toneName].sr ? ("" + ToneDefs[toneName].sr) : "27928";
-    document.getElementById("recordLen").value = ToneDefs[toneName].rec ? ("" + ToneDefs[toneName].rec) : "2.34";
-    clearKeyVoice()
-  }
+    const box = document.getElementById("presetBox")
+    if (box.selectedIndex >= 0) {
+        const toneName = box.options[box.selectedIndex].value
+        const ourFn = ToneDefs[toneName].fn.toString()
+        const snippet = formatCode(ourFn)
+        document.getElementById("voiceName").value = toneName
+        document.getElementById("snippet").value = snippet
+        document.getElementById("noteOff").value = ToneDefs[toneName].off ? ("" + ToneDefs[toneName].off) : "1.0"
+        document.getElementById("noteFreq").value = ToneDefs[toneName].freq ? ("" + ToneDefs[toneName].freq) : "440"
+        document.getElementById("sampleRate").value = ToneDefs[toneName].sr ? ("" + ToneDefs[toneName].sr) : "27928"
+        document.getElementById("recordLen").value = ToneDefs[toneName].rec ? ("" + ToneDefs[toneName].rec) : "2.34"
+        clearKeyVoice()
+    }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  let entries = Object.getOwnPropertyNames(ToneDefs);
-  entries.sort();
-  let box = document.getElementById("presetBox");
-  for (let i = 0; i < entries.length; i++) {
-    box.add(new Option(entries[i], entries[i]));
-  }
-  presetLoad();
-}, false);
-
+document.addEventListener('DOMContentLoaded', () => {
+    const entries = Object.getOwnPropertyNames(ToneDefs)
+    entries.sort()
+    const box = document.getElementById("presetBox")
+    for (let entry of entries) {
+        box.add(new Option(entry, entry))
+    }
+    presetLoad()
+}, false)
     </script>
 </head>
 <body onload="init();">
