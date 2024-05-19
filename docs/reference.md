@@ -20,6 +20,8 @@ M$(ac = DEFAULT_AUDIOCONTEXT)
 
 Create an instance of MinuteSynth that's bound to your `AudioContext` by calling `M$()`. (You can specify your own, or leave undefined to use the default one that goes to your platform's sound output). The object that is created is then a factory object that allows you to create all MinuteSynth modules.
 
+Note that you may need to do this from within a click or other type of window interaction handler in order for the web browser to let you generate sound.
+
 For an example of creating a MinuteSynth instance that records to a memory buffer, rather than going to the platform's sound output, see the `record8()` function in `support/recorder.js`.
 
 ## Module Factory Reference
