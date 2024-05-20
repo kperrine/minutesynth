@@ -26,7 +26,97 @@ For an example of creating a MinuteSynth instance that records to a memory buffe
 
 ## Module Factory Reference
 
-*
+// Osc (Oscillaor) is a simple tone generator. Specify its type and also scale, which can transform
+  // the incoming base frequency when the module is triggered. Specify r and i arrays for periodic wave.
+  // Params: t: type; S: scale; f: default frequency; d: detune, g: gain; s: start time; r: real values;
+  //         i: imag. values, n: nominal playback frequncy (for custom waveform)
+  // Type: 1 = sine, 2 = square, 3 = sawtooth, 4 = triangle, 5 = custom
+  Osc({t, S = 1, f, d, g = 1, s = 0, r, i, n = 1})
+
+  // Convenience/clarity constants for t: type:
+  sine: 1,
+  square: 2,
+  sawtooth: 3,
+  triangle: 4,
+  custom: 5,
+
+  // Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
+  // the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
+  // Params: T: duration; c: channels; S: scale; g: gain; s: start time; F: sampling rate
+  //         r: playback rate; d: detune; n: nominal playback frequency (0 for no freq. control)
+  Buf({T = 1, c = 1, S = 1, g = 1, s = 0, F = U.SR, r = 1, d, n = 0, f})
+
+  // Noise produces a playable buffer of noise.
+  // Params: g: gain; s: start time
+  Noise({ g = 1, s = 0, r, d } = {})
+
+  // Pulse produces a pulse waveform of width w at offset o.
+  // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
+  //         Also: W: samples
+  Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 }
+
+  // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
+  // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
+  // TODO: Input param: y?
+  Dist({ a = 50, F = _ => U.dw(a), g = 1, r$ })
+
+**`Filt({ t, q, f, S=1, b, g=1, r$ })`:** Filter allows for filtering of sound using the filter type provided in `t`.
+
+Params: `t:` type (non-patchable scalar), `q:` Q value, `f:` frequency, `S:` scale, `b:` boost, `g:` gain, `r$:` input
+
+The `t` "type" parameter may take any one of the following:
+
+| Attribute | Index | WebAudio String |
+|-|-|
+| M$.lowpass | 1 | 'lowpass' |
+| M$.highpass | 2 | 'highpass' |
+| M$.bandpass | 3 | 'bandpass' |
+| M$.lowshelf | 4 | 'lowshelf' |
+| M$.highshelf | 5 | 'highshelf' |
+| M$.peaking | 6 | 'peaking' |
+| M$.notch | 7 | 'notch' |
+| M$.allpass | 8 | 'allpass' |
+
+**`Conv({ b, g=1, n=true, r$ })`:** Convolver sets up a convolution using a kernel set up in a BufferNode object. `b: M$.reverb(...)` can be used for a simple reverb effect.
+
+Params: `b:` BufferNode (non-patchable object), `g:` gain, `n:` normalize (true by defualt, non-patchable value), `r$:` input
+
+ // Comp (Compressor) 
+  // Params: t: threshold, k: knee, o: ratio, d: reduction, a: attack, r: release
+  Comp({ t, k, o, d, a, r, g=1, r$})
+
+ // C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
+  C(v = 0)
+
+// Gain (Amplifier) is a very simple module that acts as a multiplier.
+  // Params: g: gain value; r$: input
+  Gain({ g = 1, r$ } = {})
+
+// ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
+  // can allow values to ramp up and down whenever the module is triggered. Use the t$ 
+  // (second parameter) to reverse-bind a trigger.
+  ADSR(adsr = U._DEFAULT_ADSR, t$)
+
+   // Prog (Program) orchestrates a series of values on a constant output that can be triggered.
+  // Params: t: timesteps (seconds from trigger) array, v: values array, p: portamento (glide) time
+  Prog({ t, v, p = 0 })
+
+  // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
+  // Gains are defaulted to 1 unless an array of gains are specified.
+  // Params: F: Array of frequencies, G: Array of gains (default: 1's), n = nominal frequency, R = sample size
+  Spec({ F, G, n = 440, R = U.SR/4, f, s = 0, g = 1, S = 1 })
+
+  // Freq (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
+  // It centrally manages a frequency and optionally has a glide (portamento) capability.
+  // Use the t$ (second parameter) to reverse-bind a trigger.
+  Freq({ p = 0, t$ } = {})
+
+// Voice represents a single channel of sound that is controlled by one main frequency.
+  // The gain g is the final "volume control" and its output is the AudioContext's destination.
+  // Set v to zero to disable attaching to ac.destination. You can get final WebAudio from .z.
+  // An automatically generated frequency controller is available at .f.
+  Voice({ g = 0.5, v = 1, p, r$ } = {})
+
 
 
 ## Common Method Reference
@@ -60,7 +150,7 @@ The MinuteSynth `$M` object also contains a couple of extra methods that are use
 * **fadeInTime:** Number of seconds to allow reverb to fade in
 * **decayTime:** Similar for the length of the reverberation
 * **subsample:** Another parameter that you'll need to play with. Example: `0.95`
-* **numChan:** Number of audio channels to render. If this is 2, then it can result in a "chorus" stereo effect.
+* **numChan:** Number of audio channels to render. If this is `2`, then it can result in a "chorus" stereo effect.
 
 **`.dw(amount = 50, W = 8192)`:** Sample distortion effect, borrowed from https://stackoverflow.com/questions/22312841/waveshaper-node-in-webaudio-how-to-emulate-distortion
 
