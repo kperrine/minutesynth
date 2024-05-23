@@ -46,28 +46,50 @@ For an example of creating a MinuteSynth instance that records to a memory buffe
   //         r: playback rate; d: detune; n: nominal playback frequency (0 for no freq. control)
   Buf({T = 1, c = 1, S = 1, g = 1, s = 0, F = U.SR, r = 1, d, n = 0, f})
 
-  // Noise produces a playable buffer of noise.
-  // Params: g: gain; s: start time
-  Noise({ g = 1, s = 0, r, d } = {})
+---
 
-  // Pulse produces a pulse waveform of width w at offset o.
-  // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
-  //         Also: W: samples
-  Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 }
+### Noise
 
-  // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-  // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
-  // TODO: Input param: y?
-  Dist({ a = 50, F = _ => U.dw(a), g = 1, r$ })
+`Noise({ g=1, s=0, r, d })`
 
-**`Filt({ t, q, f, S=1, b, g=1, r$ })`:** Filter allows for filtering of sound using the filter type provided in `t`.
+Noise produces a playable buffer of noise.
 
-Params: `t:` type (non-patchable scalar), `q:` Q value, `f:` frequency, `S:` scale, `b:` boost, `g:` gain, `r$:` input
+Params: `g:` gain; `s:` start time (non-patchable), `r:` playback rate, `d:` detune
+
+---
+
+### Pulse
+
+`Pulse({ w=0.1, o=0, S=1, f, g=1, s=0, W=1024 })`
+
+Pulse produces a pulse waveform of width w at offset o.
+
+Params: `w:` pulse width (0-1) (non-patchable); `o:` pulse offset (0-1) (non-patchable); `S:` scale; `f:` default frequency (non-patchable); `g:` gain; `s:` start time (non-patchable), `W:` samples (non-patchable)
+
+---
+
+### Dist
+
+`Dist({ a=50, F=M$.dw(a), g=1, r$ })`
+
+Distort performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes.
+
+Params: `F:` distort function (default: `M$.dw()`), `a:` function parameter (non-patchable), `r$:` input
+
+---
+
+### Filt
+
+`Filt({ t, q, f, S=1, b, g=1, r$ })`
+
+Filter allows for filtering of sound using the filter type provided in `t`.
+
+Params: `t:` type (non-patchable), `q:` Q value, `f:` frequency, `S:` scale, `b:` boost, `g:` gain, `r$:` input
 
 The `t` "type" parameter may take any one of the following:
-
+ 
 | Attribute | Index | WebAudio String |
-|-|-|
+|-|-|-|
 | M$.lowpass | 1 | 'lowpass' |
 | M$.highpass | 2 | 'highpass' |
 | M$.bandpass | 3 | 'bandpass' |
@@ -77,9 +99,17 @@ The `t` "type" parameter may take any one of the following:
 | M$.notch | 7 | 'notch' |
 | M$.allpass | 8 | 'allpass' |
 
-**`Conv({ b, g=1, n=true, r$ })`:** Convolver sets up a convolution using a kernel set up in a BufferNode object. `b: M$.reverb(...)` can be used for a simple reverb effect.
+---
+
+### Conv
+
+`Conv({ b, g=1, n=true, r$ })`
+
+Convolver sets up a convolution using a kernel set up in a BufferNode object. `b: M$.reverb(...)` can be used for a simple reverb effect.
 
 Params: `b:` BufferNode (non-patchable object), `g:` gain, `n:` normalize (true by defualt, non-patchable value), `r$:` input
+
+---
 
  // Comp (Compressor) 
   // Params: t: threshold, k: knee, o: ratio, d: reduction, a: attack, r: release
