@@ -50,7 +50,7 @@ const ToneDefs = {
     fn: M$ => {
       var voice = M$.Voice(),
           noise = M$.Noise(),
-          filter = M$.Filt( {t: M$.bandpass, q: 10, f: voice.f })
+          filter = M$.Filt({ t: M$.bandpass, q: 10, f: voice.f })
           adsr = M$.ADSR({}, voice) // Default on/off, triggered
       noise.$(filter)
       filter.$(voice)
@@ -60,6 +60,19 @@ const ToneDefs = {
     freq: 440,
     rec: 4,
     off: 3
+  },
+  basicReverb: {
+    fn: M$ => {
+      var voice = M$.Voice(),
+          adsr = M$.ADSR({}, voice), // Default on/off, triggered
+          osc = M$.Osc({ t: M$.square, f: voice.f, g: adsr }),
+          reverb = M$.Conv({ b: M$.reverb(0, 2, 0.95), r$: osc })
+      reverb.$(voice)
+      return voice
+    },
+    freq: 440,
+    rec: 4,
+    off: 0.5
   },
   basicSweep: {
     fn: M$ => {
@@ -539,7 +552,7 @@ const ToneDefs = {
           hiFilter = M$.Filt({ t: M$.highpass, q: 0.02, f: fADSR2, r$: bandFilter }),
           reverb = M$.Conv({ b: M$.reverb(0, 0.5, 0), n: true, g: 10, r$: hiFilter })
       ratios.forEach(ratio => M$.Noise().$(M$.Filt({ t: M$.bandpass, f: ratio * fundamental, q: 0.2, g: 3 }).$(bandFilter)))
-      let voice = M$.Voice({ g: 1, r$: reverb }),
+      let voice = M$.Voice({ g: 0.3, r$: reverb }),
           adsrMod = M$.ADSR({ a: 0.01, d: 1, s: 0 }, voice)
       adsrMod.$(hiFilter.g)
       voice.rg(fADSR1, fADSR2)

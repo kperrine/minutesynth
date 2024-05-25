@@ -1,6 +1,6 @@
 # MinuteSynth Reference <!-- omit in toc -->
 
-This is a reference for the MinuteSynth wrapper library for WebAudio found in modern web browsers. For more of a practical guide on usage, please refer to the [Intro Document](intro.md).
+This is a reference for the MinuteSynth wrapper library for WebAudio found in modern web browsers (plus a handful of additional functions). For more of a practical guide on usage, please refer to the [Intro Document](intro.md).
 
 - [Inclusion](#inclusion)
 - [Instanciation](#instanciation)
@@ -51,7 +51,7 @@ For an example of creating a MinuteSynth instance that records to a memory buffe
 
 ## Module Factory Reference
 
-Note that variables are *patchable* if not specified otherwise. That means they can be set to a constant number, an upstream module, or an array of uptream modules (to add upstream module outputs together). On the other hand, a number of parameters are labeled *non-patchable*. These are meant to be a constant value (or array of numbers where specified) that are set upon instanciation or explicitly assigned shortly after instanciation, and unchanged throughout the life of the module.
+Note that variables are *patchable* if not specified otherwise. That means they can be set to a constant number, set to an upstream module, later patched to an upstream module, or set/later patched to an array of uptream modules (to add upstream module outputs together). On the other hand, a number of parameters are labeled *non-patchable*. These are meant to be a constant value (or array of numbers where specified) that are set upon instanciation or explicitly assigned shortly after instanciation, and unchanged throughout the life of the module.
 
 ### ADSR (Attack, Decay, Sustain, Release)
 
