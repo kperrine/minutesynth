@@ -2,7 +2,7 @@
 
 As in the README...
 
-This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was more compact than WebAudio itself could offer. It was used by Neurolyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
+This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was more compact than WebAudio itself could offer, and to add extra bits of functionality. It was used by Neurolyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds in the repo's lab.html at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
 
 ## Modules
 
@@ -10,7 +10,7 @@ MinuteSynth is comprised of a number of modules that have a common interface for
 
 ![Module Structure](img/module_struct.png)
 
-Most modules are comprised of some kind of WebAudio AudioNode followed by a GainNode. Patches of upstream constants or audio streams may be made for the input and patchable parameters. There are sometimes other non-patchable parameters ("scalars") that are only set once upon module instanciation or by direct assignment. Finally, the output can be patched in one or more places downstream.
+Most modules are comprised of some kind of WebAudio AudioNode followed by a GainNode. Patches of upstream constants or audio streams may be made for the input and patchable parameters. There are sometimes other non-patchable parameters ("scalars" in the diagram) that are only set once upon module instanciation or by direct assignment. Finally, the output can be patched in one or more places downstream.
 
 The next section explains further.
 
@@ -160,7 +160,7 @@ It is also possible to linearly control the gain nodes that are bundled with eac
 
 ![ADSR illustration](img/adsr_curve.png)
 
-| Scalar | Meaning | Default |
+| Variable | Meaning | Default |
 |-|-|-|
 | D | Start delay (sec) | 0 |
 | b | Base value (value of "off") | 0 |
