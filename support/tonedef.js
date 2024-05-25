@@ -51,7 +51,7 @@ const ToneDefs = {
       var voice = M$.Voice(),
           noise = M$.Noise(),
           filter = M$.Filt({ t: M$.bandpass, q: 10, f: voice.f })
-          adsr = M$.ADSR({}, voice) // Default on/off, triggered
+          adsr = M$.ADSR({ s: 3 }, voice) // Default on/off, triggered
       noise.$(filter)
       filter.$(voice)
       voice.g.r$(adsr) // Master voice control
@@ -73,6 +73,25 @@ const ToneDefs = {
     freq: 440,
     rec: 4,
     off: 0.5
+  },
+  basicResonate: {
+    fn: M$ => {
+      // Resonance demo. Play at Octave 1 or 2
+      let voice = M$.Voice(),
+          adsr = M$.ADSR({}, voice), // Basic on/off
+          osc1 = M$.Osc({ t: M$.square, f: voice.f, g: adsr }),
+          osc2 = M$.Osc({ t: M$.triangle, f: voice.f, S: 1/2, g: adsr }),
+      // Get a lowpass filter with high Q value to dip from 1000 to 150 then back to 2500:
+      sweeper = M$.ADSR({ b: 1000, e: 150, s: 2500, a: 1.5, d: 8, r: 0.5 }, voice),
+      lpFilter = M$.Filt({ t: M$.lowpass, q: 18, f: sweeper, g: 1/4 })
+      // Link square wave to our filter and then out to voice:
+      lpFilter.r$([osc1, osc2])
+      voice.r$(lpFilter)
+      return voice
+    },
+    freq: 440,
+    rec: 4,
+    off: 4
   },
   basicSweep: {
     fn: M$ => {
