@@ -16,3 +16,4 @@ The .js can be included in a project and immediately used. The "recorder.html" f
 
 Please see documentation in the [docs](docs) directory for more information.
 
+Load lab.html locally into your web browser to see demos!

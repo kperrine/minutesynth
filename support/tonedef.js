@@ -415,7 +415,7 @@ const ToneDefs = {
   },
   hiHat: {
     fn: M$ => {
-      // From http://joesul.li/van/synthesizing-hi-hats/
+      // From Joe Sullivan: http://joesul.li/van/synthesizing-hi-hats/
       // NOTE: Currently does not respond to Voice frequency input.
       let fundamental = 40,
           ratios = [2, 3, 4.16, 5.43, 6.79, 8.21],
