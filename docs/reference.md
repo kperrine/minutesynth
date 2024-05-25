@@ -1,6 +1,23 @@
-# MinuteSynth Reference
+# MinuteSynth Reference <!-- omit in toc -->
 
 This is a reference for the MinuteSynth wrapper library for WebAudio found in modern web browsers. For more of a practical guide on usage, please refer to the [Intro Document](intro.md).
+
+- [Inclusion](#inclusion)
+- [Instanciation](#instanciation)
+- [Module Factory Reference](#module-factory-reference)
+  - [Osc](#osc)
+  - [Buf](#buf)
+  - [Noise](#noise)
+  - [Pulse](#pulse)
+  - [Dist](#dist)
+  - [Filt](#filt)
+  - [Conv](#conv)
+  - [Voice](#voice)
+- [Common Method Reference](#common-method-reference)
+  - [All Modules](#all-modules)
+  - [Patchable Parameters](#patchable-parameters)
+- [Additional Utility Methods](#additional-utility-methods)
+- [Helper Functions](#helper-functions)
 
 ## Inclusion
 
@@ -20,31 +37,57 @@ M$(ac = DEFAULT_AUDIOCONTEXT)
 
 Create an instance of MinuteSynth that's bound to your `AudioContext` by calling `M$()`. (You can specify your own, or leave undefined to use the default one that goes to your platform's sound output). The object that is created is then a factory object that allows you to create all MinuteSynth modules.
 
-Note that you may need to do this from within a click or other type of window interaction handler in order for the web browser to let you generate sound.
+Note that you may need to do this from within a click or other type of window interaction handler for the web browser to let you generate sound.
 
 For an example of creating a MinuteSynth instance that records to a memory buffer, rather than going to the platform's sound output, see the `record8()` function in `support/recorder.js`.
 
 ## Module Factory Reference
 
-// Osc (Oscillaor) is a simple tone generator. Specify its type and also scale, which can transform
-  // the incoming base frequency when the module is triggered. Specify r and i arrays for periodic wave.
-  // Params: t: type; S: scale; f: default frequency; d: detune, g: gain; s: start time; r: real values;
-  //         i: imag. values, n: nominal playback frequncy (for custom waveform)
-  // Type: 1 = sine, 2 = square, 3 = sawtooth, 4 = triangle, 5 = custom
-  Osc({t, S = 1, f, d, g = 1, s = 0, r, i, n = 1})
+### Osc
 
-  // Convenience/clarity constants for t: type:
-  sine: 1,
-  square: 2,
-  sawtooth: 3,
-  triangle: 4,
-  custom: 5,
+**`Osc({ t, S=1, f, d, g=1, s=0, r, i, n=1 })`**
 
-  // Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
-  // the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
-  // Params: T: duration; c: channels; S: scale; g: gain; s: start time; F: sampling rate
-  //         r: playback rate; d: detune; n: nominal playback frequency (0 for no freq. control)
-  Buf({T = 1, c = 1, S = 1, g = 1, s = 0, F = U.SR, r = 1, d, n = 0, f})
+Oscillaor is a simple tone generator. Specify its type and also scale, which can transform the incoming base frequency when the module is triggered. Specify `r` and `i` arrays for periodic wave.
+
+Params: `t:` type (non-patchable parameter); `S:` scale (non-patchable parameter); `f:` default frequency, or patch from another module that serves as frequency input; `d:` detune, `g:` gain; `s:` start time (non-patchable parameter); `r:` real values array; `i:` imag. values array, `n:` nominal playback frequncy (for custom waveform; non-patchable parameter)
+
+The type `t:` parameter must take one of these values:
+
+| Attribute | Index | WebAudio String |
+|-|-|-|
+| M$.sine | 1 | 'sine' |
+| M$.square | 2 | 'square' |
+| M$.sawtooth | 3 | 'sawtooth' |
+| M$.triangle | 4 | 'triangle' |
+| M$.custom | 5 | 'custom' |
+
+The start `s:` parameter may take:
+
+| Value | Meaning |
+|-|-|
+| `-1` | Defer starting; use `.s.go()` attribute to then start |
+| `0` | Start immediately (default). Generally, one varies the gain `.g` attribute to control sound output. |
+| Other value | Specific time with respect to `AudioContext.currentTime` to schedule starting |
+
+After instanciation, the `.s` property allows for on/off control with `.s.go(startTime)` and `.s.no(startTime)` respectively.
+
+---
+
+### Buf
+
+`Buf({ T=1, c=1, S=1, g=1, s=0, F=AudioContext.samplerate, r=1, d, n=0, f })`
+
+Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is `.mem().length`. Call `.lock()` to lock in the memory so that the buffer can be used. See additional notes on `Buf` further below.
+
+Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1`, `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate; `d:` detune; `n:` nominal playback frequency (0 for no freq. control)
+
+Methods:
+
+**`.mem(chan=0)`:** Returns an editable array that represents the sample buffer for the given channel. Generally, for "left" or "mono", `chan` should be `0`.
+
+**`.lock(loop=true)`:** Commits the buffer memory so that it can be played back. Set `loop` to `true` to allow the buffer to play repeatedly, or `false` to just play once.
+
+After instanciation, the `.s` property allows for on/off control with `.s.go(startTime)` and `.s.no(startTime)` respectively.
 
 ---
 
@@ -136,18 +179,32 @@ Params: `b:` BufferNode (non-patchable object), `g:` gain, `n:` normalize (true 
   // Params: F: Array of frequencies, G: Array of gains (default: 1's), n = nominal frequency, R = sample size
   Spec({ F, G, n = 440, R = U.SR/4, f, s = 0, g = 1, S = 1 })
 
+---
+
   // Freq (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
   // It centrally manages a frequency and optionally has a glide (portamento) capability.
   // Use the t$ (second parameter) to reverse-bind a trigger.
   Freq({ p = 0, t$ } = {})
 
-// Voice represents a single channel of sound that is controlled by one main frequency.
-  // The gain g is the final "volume control" and its output is the AudioContext's destination.
-  // Set v to zero to disable attaching to ac.destination. You can get final WebAudio from .z.
-  // An automatically generated frequency controller is available at .f.
-  Voice({ g = 0.5, v = 1, p, r$ } = {})
+---
 
+### Voice
 
+**`Voice({ g=0.5, v=1, p, r$ })`**
+
+Represents a single channel of sound that is controlled by one main frequency.
+
+The gain `g:` is the final "volume control" and its output is the AudioContext's destination. Set `v:` to zero to disable attaching to the default AudioContext `ac.destination`. You can get the final WebAudio output from the `.z` attribute. An automatically generated frequency controller is available at `.f`. Use `p:` to enable and set the frequency portamento, if desired.
+
+Methods:
+
+**`.$(module)`:** This special forward-patch registers the given module with the `.rg()` method to receive trigger events.
+
+**`.on(onTime, freq)`:** Calls `.on()` for all modules registered to receive triggering events. The `onTime` paramter will allow for time (with respect to `AudioContext.currentTime`) to be passed to registered modules' `.on()` methods; use `0` to specify current time. Also `freq` is the frequency in Hz to pass to member modules' `.on()` method.
+
+**`.off(offTime)`:** Calls `.off()` for all modules registered for trigger events. Use `offTime` to pass a specific time (with respect to `AudioContext.currentTime`) to respective modules. Leave `offTime` undefined to use the current time.
+
+**`.rg(...modules)`:** Registers one or more modules as triggerable. These will then be called when `.on()` or `.off()` are called. You can also register modules by patching them to Voice using `.$()`
 
 ## Common Method Reference
 

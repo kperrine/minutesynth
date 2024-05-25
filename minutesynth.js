@@ -15,7 +15,7 @@ var $Y = (a, f) => [].concat(a).forEach(element => f(element));
 var ACX = window.AudioContext || window.webkitAudioContext;
 
 // M$ (MinuteSynth) object that specifies and produces objects tied to the given AudioContext.
-var M$ = (ac = new ACX(), U = {}) => ($A(U, {
+var M$ = (ac=new ACX(), U={}) => ($A(U, {
   /*
    * Constants and configurations:
    */
@@ -34,7 +34,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // s: sustain value (after the attack-decay sequence
   // r: release time (from s to b, occurring when triggerOff() is called)
   // p: auto-pulse-- if nonzero, automatically does a triggerOff p seconds after triggerOn.
-  _DEFAULT_ADSR: {D: 0, b: 0, e: 1, a: 1e-3, d: 0, s: 1, r: 0, p: 0},
+  _DEFAULT_ADSR: { D: 0, b: 0, e: 1, a: 1e-3, d: 0, s: 1, r: 0, p: 0 },
 
   // A reference to the AudioContext object that is to be used to produce WebAudio objects.
   ac,
@@ -51,7 +51,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // Params: t: type; S: scale; f: default frequency; d: detune, g: gain; s: start time; r: real values;
   //         i: imag. values, n: nominal playback frequncy (for custom waveform)
   // Type: 1 = sine, 2 = square, 3 = sawtooth, 4 = triangle, 5 = custom
-  Osc({t, S = 1, f, d, g = 1, s = 0, r, i, n = 1}) {
+  Osc({ t, S=1, f, d, g=1, s=0, r, i, n=1 }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       o: ac.createOscillator(),
@@ -80,7 +80,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
   // Params: T: duration; c: channels; S: scale; g: gain; s: start time; F: sampling rate
   //         r: playback rate; d: detune; n: nominal playback frequency (0 for no freq. control)
-  Buf({T = 1, c = 1, S = 1, g = 1, s = 0, F = U.SR, r = 1, d, n = 0, f}) {
+  Buf({ T=1, c=1, S=1, g=1, s=0, F=U.SR, r=1, d, n=0, f }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       b: ac.createBuffer(c, ~~(F * T), F),
@@ -88,10 +88,10 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
       T,
       F,
       N: ~~(F * T),
-      x(chan) {
+      mem(chan=0) {
         return this.b.getChannelData(chan);
       },
-      L(loop = true) {
+      lock(loop = true) {
         this.B.buffer = this.b;
         this.B.loop = loop;
       },
@@ -112,37 +112,37 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
 
   // Noise produces a playable buffer of noise.
   // Params: g: gain; s: start time
-  Noise({ g = 1, s = 0, r, d } = {}) {
+  Noise({ g=1, s=0, r, d } = {}) {
     let module = U.Buf({T: U._NOISE_LEN, g, s, r, d, n: 0}),
-        data = module.x(0),
+        data = module.mem(),
         i;
 		for (i = 0; i < module.N; i++) {
 			data[i] = $R();
     }
-    module.L();
+    module.lock();
     return module;
   },
 
   // Pulse produces a pulse waveform of width w at offset o.
   // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
   //         Also: W: samples
-  Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
+  Pulse({ w=0.1, o=0, S=1, f, g=1, s=0, W=1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
     let module = U.Buf({T: W / U.SR, S, f, g, s, n: 1}),
-        data = module.x(0),
+        data = module.mem(),
         bias = 0.5 - w,
         i;
 		for (i in data) {
       data[i] = bias + ((((i - module.N * o) % module.N) / module.N <= w) ? 0.5 : -0.5);
 		}
-    module.L();
+    module.lock();
     return module;
   },
 
   // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
   // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
   // TODO: Input param: y?
-  Dist({ a = 50, F = _ => U.dw(a), g = 1, r$ }) {
+  Dist({ a=50, F=_ => U.dw(a), g=1, r$ }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       w: ac.createWaveShaper()
@@ -156,7 +156,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
 
   // Filt (Filter) allows for filtering of sound using the filter type provided in t.
   // Params: t: type, q: Q value, f: frequency, S: scale, b: boost, g: gain, r$: input
-  Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
+  Filt({ t, q, f, S=1, b, g=1, r$ }) {
     let module = {
       ...U._ModuleBaseAmp(g),
       q: ac.createBiquadFilter(),
@@ -215,7 +215,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   },
 
   // C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
-  C(v = 0) {
+  C(v=0) {
     let module = {
       ...U._ModuleBase(),
       z: ac.createConstantSource()
@@ -227,7 +227,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
 
   // Gain (Amplifier) is a very simple module that acts as a multiplier.
   // Params: g: gain value; r$: input
-  Gain({ g = 1, r$ } = {}) {
+  Gain({ g=1, r$ } = {}) {
     let module = U._ModuleBaseAmp(g);
     module._addParam(U._ParamAudio(module.z, module, r$));
     return module;
@@ -239,7 +239,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
   // can allow values to ramp up and down whenever the module is triggered. Use the t$ 
   // (second parameter) to reverse-bind a trigger.
-  ADSR(adsr = U._DEFAULT_ADSR, t$) {
+  ADSR(adsr=U._DEFAULT_ADSR, t$) {
     let module = {
       ...U.C(),
       a: U.mA(adsr),
@@ -298,7 +298,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
   // Gains are defaulted to 1 unless an array of gains are specified.
   // Params: F: Array of frequencies, G: Array of gains (default: 1's), n = nominal frequency, R = sample size
-  Spec({ F, G, n = 440, R = U.SR/4, f, s = 0, g = 1, S = 1 }) {
+  Spec({ F, G, n=440, R=U.SR/4, f, s=0, g=1, S=1 }) {
     let real = new Array(R).fill(0),
         imag = [...real],
         i, j;
@@ -315,7 +315,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // Freq (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
   // It centrally manages a frequency and optionally has a glide (portamento) capability.
   // Use the t$ (second parameter) to reverse-bind a trigger.
-  Freq({ p = 0, t$ } = {}) {
+  Freq({ p=0, t$ } = {}) {
     let module = {
       ...U.C(),
       p,
@@ -344,7 +344,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   // The gain g is the final "volume control" and its output is the AudioContext's destination.
   // Set v to zero to disable attaching to ac.destination. You can get final WebAudio from .z.
   // An automatically generated frequency controller is available at .f.
-  Voice({ g = 0.5, v = 1, p, r$ } = {}) {
+  Voice({ g=0.5, v=1, p, r$ } = {}) {
     // TODO: Allow inputs to be registrants
     let ret = {
       ...U.Gain({g, r$}),
@@ -411,8 +411,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
       // TODO: Add option to inherit parameters from target, if target is a module. Don't copy "in", and
       // if param exists in this, add index to it, e.g. "g2". That would allow for easier manipulation
       // of params from one location.
-      // TODO: Another choice: add option to patchIn, not attach "out". That makes it easier to also
-      // keep "out" up to date, can also manage "in" in a little better way.
+      // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
       let param = tgtThing;
       if (tgtThing._params) {
         param = tgtThing._params[tgtParamName || 'in'];
@@ -466,7 +465,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
       }
       //return param;
     },
-    _addFreqHelper(control, defFreq = 0) {
+    _addFreqHelper(control, defFreq=0) {
       let Z = this;
       control.value = 0;
       Z._S = U.Gain();
@@ -523,7 +522,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   /*
    * Intermediate building-blocks:
    */
-  _ModuleBaseAmp(gainVal = 1) {
+  _ModuleBaseAmp(gainVal=1) {
     let ret = {
       ...U._ModuleBase(),
       z: ac.createGain(),
@@ -572,7 +571,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
   }),
 
   // ParamAudio allows access for audio inputs to a module.
-  _ParamAudio: (obj, module, defVal, paramName = 'in') => ({
+  _ParamAudio: (obj, module, defVal, paramName='in') => ({
     ...U._Param(paramName, obj, module, defVal),
     z0() {
       obj.value = 0;
@@ -603,7 +602,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
    */
   // reverb() is a simple reverb effect, borrowed from
   // https://github.com/adelespinasse/reverbGen/blob/master/reverbgen.js
-  reverb(fadeInTime, decayTime, subsample, numChan = 2) {
+  reverb(fadeInTime, decayTime, subsample, numChan=2) {
     // params.decayTime is the -60dB fade time. We let it go 50% longer to get to -90dB.
     let totalTime = decayTime * 1.5,
       decaySampleFrames = ~~(decayTime * U.SR),
@@ -613,7 +612,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
       reverbIR = U.Buf({c: numChan, T: totalTime}),
       i, j, chan;
     for (i = 0; i < numChan; i++) {
-      chan = reverbIR.x(i);
+      chan = reverbIR.mem(i);
       for (j = 0; j < reverbIR.N; j++) {
         chan[j] = ($R(1, 0) > subsample) ? $R() * decayBase ** j : 0;
       }
@@ -626,7 +625,7 @@ var M$ = (ac = new ACX(), U = {}) => ($A(U, {
 
   // dw is a simple distortion effect used by the Distortion module that "warms" waves through a sigmoid,
   // borrowed from https://stackoverflow.com/questions/22312841/waveshaper-node-in-webaudio-how-to-emulate-distortion
-  dw(amount = 50, W = 8192) {
+  dw(amount=50, W=8192) {
     let curve = new Float32Array(W),
       deg = Math.PI / 180,
       i = 0,
