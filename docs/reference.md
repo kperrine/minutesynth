@@ -5,14 +5,22 @@ This is a reference for the MinuteSynth wrapper library for WebAudio found in mo
 - [Inclusion](#inclusion)
 - [Instanciation](#instanciation)
 - [Module Factory Reference](#module-factory-reference)
-  - [Osc](#osc)
-  - [Buf](#buf)
+  - [Osc (Oscillator)](#osc-oscillator)
+  - [Buf (Buffer)](#buf-buffer)
   - [Noise](#noise)
   - [Pulse](#pulse)
-  - [Dist](#dist)
-  - [Filt](#filt)
-  - [Conv](#conv)
+  - [Dist (Distorter)](#dist-distorter)
+  - [Filt (Filter)](#filt-filter)
+  - [Conv (Convolver)](#conv-convolver)
+  - [Comp (Compressor)](#comp-compressor)
+  - [C (Constant)](#c-constant)
+  - [Gain](#gain)
+  - [ADSR (Attack, Decay, Sustain, Release)](#adsr-attack-decay-sustain-release)
+  - [Prog (Program)](#prog-program)
+  - [Spec (Spectrum)](#spec-spectrum)
+  - [Frequency Controller](#frequency-controller)
   - [Voice](#voice)
+  - [Others TODO](#others-todo)
 - [Common Method Reference](#common-method-reference)
   - [All Modules](#all-modules)
   - [Patchable Parameters](#patchable-parameters)
@@ -43,7 +51,7 @@ For an example of creating a MinuteSynth instance that records to a memory buffe
 
 ## Module Factory Reference
 
-### Osc
+### Osc (Oscillator)
 
 **`Osc({ t, S=1, f, d, g=1, s=0, r, i, n=1 })`**
 
@@ -67,13 +75,13 @@ The start `s:` parameter may take:
 |-|-|
 | `-1` | Defer starting; use `.s.go()` attribute to then start |
 | `0` | Start immediately (default). Generally, one varies the gain `.g` attribute to control sound output. |
-| Other value | Specific time with respect to `AudioContext.currentTime` to schedule starting |
+| Greater than 0 | Specific time with respect to `AudioContext.currentTime` to schedule starting |
 
 After instanciation, the `.s` property allows for on/off control with `.s.go(startTime)` and `.s.no(startTime)` respectively.
 
 ---
 
-### Buf
+### Buf (Buffer)
 
 `Buf({ T=1, c=1, S=1, g=1, s=0, F=AudioContext.samplerate, r=1, d, n=0, f })`
 
@@ -111,25 +119,25 @@ Params: `w:` pulse width (0-1) (non-patchable); `o:` pulse offset (0-1) (non-pat
 
 ---
 
-### Dist
+### Dist (Distorter)
 
 `Dist({ a=50, F=M$.dw(a), g=1, r$ })`
 
-Distort performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes.
+Distort performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes. See [WebAudio docs](https://developer.mozilla.org/en-US/docs/Web/API/WaveShaperNode) for more information.
 
 Params: `F:` distort function (default: `M$.dw()`), `a:` function parameter (non-patchable), `r$:` input
 
 ---
 
-### Filt
+### Filt (Filter)
 
 `Filt({ t, q, f, S=1, b, g=1, r$ })`
 
-Filter allows for filtering of sound using the filter type provided in `t`.
+Biquad filtering of sound using the filter type provided in `t`.
 
-Params: `t:` type (non-patchable), `q:` Q value, `f:` frequency, `S:` scale, `b:` boost, `g:` gain, `r$:` input
+Params: `t:` type (non-patchable), `q:` Q value (or "width" of the filter), `f:` frequency, `S:` scale (non-patchable), `b:` boost, `g:` gain, `r$:` input
 
-The `t` "type" parameter may take any one of the following:
+The `t` "type" parameter must take one of the following:
  
 | Attribute | Index | WebAudio String |
 |-|-|-|
@@ -144,47 +152,100 @@ The `t` "type" parameter may take any one of the following:
 
 ---
 
-### Conv
+### Conv (Convolver)
 
 `Conv({ b, g=1, n=true, r$ })`
 
-Convolver sets up a convolution using a kernel set up in a BufferNode object. `b: M$.reverb(...)` can be used for a simple reverb effect.
+Convolver sets up a convolution using a kernel set up in a BufferNode object. `b: M$.reverb(...)` can be used for a simple reverb effect. See [WebAudio docs](https://developer.mozilla.org/en-US/docs/Web/API/ConvolverNode) for more information.
 
 Params: `b:` BufferNode (non-patchable object), `g:` gain, `n:` normalize (true by defualt, non-patchable value), `r$:` input
 
 ---
 
- // Comp (Compressor) 
-  // Params: t: threshold, k: knee, o: ratio, d: reduction, a: attack, r: release
-  Comp({ t, k, o, d, a, r, g=1, r$})
+### Comp (Compressor) 
 
- // C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
-  C(v = 0)
+`Comp({ t, k, o, d, a, r, g=1, r$ })`
 
-// Gain (Amplifier) is a very simple module that acts as a multiplier.
-  // Params: g: gain value; r$: input
-  Gain({ g = 1, r$ } = {})
+A classic compressor that can gracefully regulate the levels of a sound and prevent cliping (e.g. loud sounds that exceed the -1 to 1 sample amplitude limits). See [WebAudio docs](https://developer.mozilla.org/en-US/docs/Web/API/DynamicsCompressorNode) for more information.
 
-// ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
-  // can allow values to ramp up and down whenever the module is triggered. Use the t$ 
-  // (second parameter) to reverse-bind a trigger.
-  ADSR(adsr = U._DEFAULT_ADSR, t$)
-
-   // Prog (Program) orchestrates a series of values on a constant output that can be triggered.
-  // Params: t: timesteps (seconds from trigger) array, v: values array, p: portamento (glide) time
-  Prog({ t, v, p = 0 })
-
-  // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
-  // Gains are defaulted to 1 unless an array of gains are specified.
-  // Params: F: Array of frequencies, G: Array of gains (default: 1's), n = nominal frequency, R = sample size
-  Spec({ F, G, n = 440, R = U.SR/4, f, s = 0, g = 1, S = 1 })
+Params: `t:` threshold, `k:` knee, `o:` ratio, `d:` reduction (non-patchable), `a:` attack, `r:` release
 
 ---
 
-  // Freq (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
-  // It centrally manages a frequency and optionally has a glide (portamento) capability.
-  // Use the t$ (second parameter) to reverse-bind a trigger.
-  Freq({ p = 0, t$ } = {})
+### C (Constant)
+
+`C(v=0)`
+
+Constant provides a patchable value that can remain steady, or be altered through time. (That isn't so "constant" after all).
+
+---
+
+### Gain
+
+`Gain({ g=1, r$ })`
+
+Gain (or, amplifier) is a very simple module that acts as a multiplier.
+
+Params: g: gain value; r$: input
+
+---
+
+### ADSR (Attack, Decay, Sustain, Release)
+
+`ADSR({ D: 0, b: 0, e: 1, a: 1e-3, d: 0, s: 1, r: 0, p: 0 }, t$)`
+
+This uses ADSR parameters to create a module that can allow the output value to ramp up and down as specified whenever the module is triggered. Use the `t$` (second parameter) to reverse-bind a trigger (e.g. from [Voice](#voice)).
+
+ADSR parameters (see the [Intro docs](intro.md#adsr-controls) for a diagram that shows what each of these parameters means):
+
+| Parameter | Meaning | Default |
+|-|-|-|
+| `D` | Start delay (sec) | 0 |
+| `b` | Base value (value of "off") | 0 |
+| `e` | Attack maximum value | 1 |
+| `a` | Attack time (sec) | 1e-3 |
+| `d` | Decay (time to go from e to s) | 0 |
+| `s` | Sustain value | 1 |
+| `r` | Release time (time to go from s to b when triggerOff) | 0 |
+| `p` | Auto-pulse (if nonzero, time to automatically triggerOff) | 0 |
+
+---
+
+### Prog (Program)
+
+`Prog({ t, v, p=0 })`
+
+This orchestrates a series of values on a constant output that can be triggered.
+
+Params (all non-patchable): `t:` timesteps (seconds from trigger) array, `v:` values array, `p:` portamento (glide) time in seconds
+
+> **TODO:** Allow for repeats
+
+---
+
+### Spec (Spectrum)
+
+`Spec({ F, G, n=440, R=AudioContext.samplerate / 4, f, s=0, g=1, S=1 })`
+
+This creates a complex oscillator waveform from a series of real frequencies. Gains are defaulted to 1 unless an array of gains is specified.
+
+Params (all non-patchable): `F:` Array of frequencies, `G:` Array of gains (default: 1's), `n:` nominal frequency, `R:` sample size
+
+There is also `g:` (patchable) for default gain, and `S:` (non-patchable) start time (which can be `-1`, `0`, and greater as documented in [Oscillator](#osc-oscillator))
+
+---
+
+### Frequency Controller
+
+`Freq({ p=0, t$ })`
+
+This is like a voltage control to attach to oscillators and other frequency inputs. It can be used to centrally manage a frequency and optionally has a glide (portamento) capability.
+
+Use the `t$` (second parameter) to reverse-bind a trigger source, like [Voice](#voice).
+
+Method:
+
+**`.on(onTime, freq)`:** Sets desired frequency (in Hz) at the given time. Normally this would be called by having registered this to [Voice](#voice), and calling the Voice `.on()` method.
 
 ---
 
@@ -194,7 +255,7 @@ Params: `b:` BufferNode (non-patchable object), `g:` gain, `n:` normalize (true 
 
 Represents a single channel of sound that is controlled by one main frequency.
 
-The gain `g:` is the final "volume control" and its output is the AudioContext's destination. Set `v:` to zero to disable attaching to the default AudioContext `ac.destination`. You can get the final WebAudio output from the `.z` attribute. An automatically generated frequency controller is available at `.f`. Use `p:` to enable and set the frequency portamento, if desired.
+The gain `g:` is the final "volume control" and its output is the AudioContext's destination. Set `v:` to zero to disable attaching to the default AudioContext `ac.destination`. You can get the final WebAudio output from the `.z` attribute. An automatically generated [frequency controller](#frequency-controller) is available at `.f`. Use `p:` to enable and set the frequency portamento, if desired.
 
 Methods:
 
@@ -205,6 +266,15 @@ Methods:
 **`.off(offTime)`:** Calls `.off()` for all modules registered for trigger events. Use `offTime` to pass a specific time (with respect to `AudioContext.currentTime`) to respective modules. Leave `offTime` undefined to use the current time.
 
 **`.rg(...modules)`:** Registers one or more modules as triggerable. These will then be called when `.on()` or `.off()` are called. You can also register modules by patching them to Voice using `.$()`
+
+---
+
+### Others TODO
+
+* Channel split
+* Channel join
+* Stereo pan
+* Cross-fade
 
 ## Common Method Reference
 
@@ -224,7 +294,7 @@ Methods:
 
 **`.r$(source)`:** Reverse-patch: Same operation as `.r$()` for modules.
 
-**See Also** the "Lower Level Controls" section of the [Intro](intro.md) Document.
+**See Also** the "Lower Level Controls" section of the [Intro](intro.md#lower-level-controls) Document for the time-dependent value-setting methods.
 
 ## Additional Utility Methods
 
