@@ -478,6 +478,10 @@ function presetLoad() {
     }
 }
 
+function killSound() {
+    clearKeyVoice()
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const entries = Object.getOwnPropertyNames(ToneDefs)
     entries.sort()
@@ -542,6 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div></div>
         <label for="octave">Octave: </label>
         <input type="number" id="octave" min="0" max="9" maxlength="1" value="4" />
+        <button id="killSound" onclick="killSound();">Force Off</button>
         </div>
     </div>
 </body>
