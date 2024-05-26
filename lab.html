@@ -314,7 +314,7 @@ function init() {
     document.addEventListener('mousedown', pressAction)
     document.addEventListener('mouseup', releaseAction)
     document.addEventListener('touchmove', keyZoneMovement)
-    document.addEventListener('touchstart', pressAction)
+    document.addEventListener('touchstart', keyZoneMovement)
     document.addEventListener('touchend', releaseAction)
     document.addEventListener('touchcancel', releaseAction)
     //document.getElementById("snippet").addEventListener("change", clearKeyVoice)
