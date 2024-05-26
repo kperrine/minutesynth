@@ -1,6 +1,6 @@
 # MinuteSynth
 
-Version 0.95
+Version 0.95a
 
 *"How it's pronounced is up to you!"*
 
@@ -12,8 +12,8 @@ This is a small-scale front-end for working with the WebAudio library found in m
 
 This differs from some other incredibly small synthesizers in that MinuteSynth heavily uses WebAudio directly, whereas others like ZZFX calculate a buffered sound sample from a preselected set of functions for playing back. There may be advantages and disadvantages for each approach; it depends on the final targeted purpose.
 
-The .js can be included in a project and immediately used. The "recorder.html" file allows for immediate synth editing and raw audio file recording. A number of demos are provided.
+The .js can be included in a project and immediately used. The "lab.html" file allows for immediate synth editing and raw audio file recording. A number of demos are provided.
 
 Please see documentation in the [docs](docs) directory for more information.
 
-Load lab.html locally into your web browser, or access online at [http://www.academiken.com/minutesynth/lab.html](http://www.academiken.com/minutesynth/lab.html) to see demos!
+Load "lab.html" locally into your web browser, or access online at [http://www.academiken.com/minutesynth/lab.html](http://www.academiken.com/minutesynth/lab.html) to see demos!
