@@ -16,4 +16,4 @@ The .js can be included in a project and immediately used. The "recorder.html" f
 
 Please see documentation in the [docs](docs) directory for more information.
 
-Load lab.html locally into your web browser to see demos!
+Load lab.html locally into your web browser, or access online at [http://www.academiken.com/minutesynth/lab.html](http://www.academiken.com/minutesynth/lab.html) to see demos!
