@@ -2,9 +2,9 @@
 <html lang="en-us">
 <head>
     <title>MinuteSynth Lab</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
-    <title>Recorder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>MinuteSynth Lab</title>
     <script src="minutesynth.js"></script>
     <script src="support/tonedef.js"></script>
     <script src="support/recorder.js"></script>
@@ -32,6 +32,7 @@
   transform: translateY(-50%);
   width: 80%;
   height: 80%;
+  touch-action: none;
 }
 .whiteKey {
     top: 0;
@@ -179,6 +180,9 @@ function playKey(offset) {
     if (!m$) {
         synthInit()
     }
+    if (m$.ac.state === "suspended") {
+        m$.ac.resume()
+    }
     if (!keyVoice) {
         createKeyVoice()
         if (keyVoice) {
@@ -223,15 +227,24 @@ function highlightKey(keyID, activate) {
     }
 }
 function keyZoneMovement(event) {
-    const underElement = document.elementFromPoint(event.clientX, event.clientY)        
+    if (event && !event.isPrimary) {
+        return
+    }
+    const underElement = document.elementFromPoint(event.clientX, event.clientY)
     currentID = ""
     if (underElement.id in MAPPING) {
         currentID = underElement.id
+        console.log(`KeyZoneMovement: currentID = ${currentID}`)
     }
     if (currentID !== "") {
         if (activeID !== "" && activeID != currentID) {
             highlightKey(activeID, false)
-            pressAction(event)
+            //pressAction(event)
+            playKey(MAPPING[currentID])
+            if (keyVoice) {
+                highlightKey(currentID, true)
+                activeID = currentID
+            }
         }
     }
 }
@@ -242,6 +255,17 @@ function pressAction(event) {
     }
     codeCache = document.getElementById("snippet").value
 
+    if (event && !event.isPrimary) {
+        return
+    }
+    if (currentID === "") {
+        // Hacky way of handling situation where press happens before move.
+        const underElement = document.elementFromPoint(event.clientX, event.clientY)
+        if (underElement.id in MAPPING) {
+            currentID = underElement.id
+            console.log(`PressAction activates ${currentID}`)
+        }
+    }
     if (currentID !== "") {
         playKey(MAPPING[currentID])
         if (keyVoice) {
@@ -251,10 +275,15 @@ function pressAction(event) {
     }
 }
 function releaseAction(event) {
+    if (event && !event.isPrimary) {
+        return
+    }
     if (activeID !== "") {
+        console.log(`ReleaseAction deactivates ${activeID}`)
         highlightKey(activeID, false)
         offKey()
         activeID = ""
+        currentID = ""
     }        
 }
 function showKeyboard() {
@@ -310,14 +339,11 @@ function recPlay() {
 }
 
 function init() {
-    document.addEventListener('mousemove', keyZoneMovement)
-    document.addEventListener('mousedown', pressAction)
-    document.addEventListener('mouseup', releaseAction)
-    document.addEventListener('touchmove', keyZoneMovement)
-    document.addEventListener('touchstart', keyZoneMovement)
-    document.addEventListener('touchend', releaseAction)
-    document.addEventListener('touchcancel', releaseAction)
-    //document.getElementById("snippet").addEventListener("change", clearKeyVoice)
+    const element = document.getElementById('keyArea')
+    element.addEventListener('pointermove', keyZoneMovement)
+    element.addEventListener('pointerdown', pressAction)
+    element.addEventListener('pointerup', releaseAction)
+    //element.addEventListener('pointerout', releaseAction)
 }
 
 function synthInit() {
@@ -529,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="exportLink"></div>
         </div>
         <div id="keyPanel">
-        <div class="keyBorder"><div class="keyArea">
+        <div class="keyBorder"><div class="keyArea" id="keyArea">
             <div class="whiteKey" id="cN"></div>
             <div class="blackKey" id="cS"></div>
             <div class="whiteKey" id="dN"></div>
