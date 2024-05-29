@@ -2,7 +2,7 @@
 
 *"How it's pronounced is up to you!"*
 
-Version 0.95b
+Version 0.95c
 
 Copyright (C) Kenneth A. Perrine, 2024<br>
 Please see LICENSE file for MIT License<br>
