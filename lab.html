@@ -149,13 +149,21 @@ function clearKeyVoice() {
 }
 
 function checkKeyVoice() {
+    let flag = false;
     if (keyVoice) {
         if (!(keyVoice.on && keyVoice.off && keyVoice.z)) {
             console.log("ERROR: The code block is not returning a M$.Voice module.")
-            alert("The code block doesn't return a M$.Voice module.")
+            flag = true;
             clearKeyVoice()
         }
-    }    
+    }
+    else {
+        console.log("ERROR: The code block is returning undefined.")
+        flag = true
+    }
+    if (flag) {
+        alert("The code block doesn't return a M$.Voice module.")
+    }
 }
 
 function createKeyVoice() {
@@ -524,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="wrapper">
         <canvas class="visualizer" width="640" height="100"></canvas>
         <div>
-        Write a synth definition. Parameter M$ is the MinuteSynth object, and code must return a M$.Voice module.<br>
+        Write a synth definition. Variable M$ is the MinuteSynth object, and code must return a M$.Voice module.<br>
         <textarea id="snippet" rows="16" cols="120">
         </textarea>
     <div>

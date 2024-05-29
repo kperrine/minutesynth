@@ -237,7 +237,7 @@ const ToneDefs = {
       // Created by 7r1x/neuralyte
       const voice = M$.Voice()
       const slide1 = M$.ADSR({ a: 2, b: 146, e: 78, s: 390, r: 1 }, voice)
-      var adsr = M$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
+      const adsr = M$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
       const osc1 = M$.Osc({ t: 'sine', f: slide1, S: 1/2, g: adsr })
       const noiseADSR = adsr = M$.ADSR({ D: 0.4, b: 0, e: 0.01, s: 0.05, a: 1, d: 0.1, r: 0.1, p: 0 }, voice)
       const noise = M$.Noise({ g: noiseADSR })
@@ -260,7 +260,7 @@ const ToneDefs = {
       // NOTE: Currently does not respond to Voice frequency input.
       const voice = M$.Voice()
       const slide1 = M$.ADSR({ a: 2, b: 146, e: 0.73, s: 1, r: 1 }, voice)
-      var adsr = M$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
+      const adsr = M$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
       const osc1 = M$.Osc({ t: 'sine', f: slide1, S: 1/2, g: adsr })
       const distort = M$.Dist({ a: 55, r$: osc1, g: 1 })
       const filterADSR = adsr = M$.ADSR({ D: 0.01, b: 1000, e: 100, s: 1000, a: 0.21, d: 0.1, r: 0.9, p: 0 }, voice) // change s for fun
@@ -551,7 +551,7 @@ const ToneDefs = {
           fADSRMult = M$.Gain({ g: voice.f, r$: fADSR }),
           filter = M$.Filt({ t: M$.lowpass, q: 1, f: fADSRMult, r$: modulator }),
           distorter = M$.Dist({ a: 15, r$: filter }),
-          loud = M$.Gain({ g:3, r$: distorter })
+          loud = M$.Gain({ g: 3, r$: distorter })
       loud.$(voice)
       M$.ADSR({r: 1}, voice).$(voice.g)
       return voice
