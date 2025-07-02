@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<head>
+	<title>MinuteSynth Minimal Example</title>
+    <script src="minutesynth.js"></script>
+    <script src="support/tonedef.js"></script>
+    <script>
+var msInstance
+
+function init() {
+    msInstance = M$()
+}
+
+function play(voiceName) {
+    // The audio output will only work after a user interaction event.
+    if (!msInstance) {
+        init()
+    }
+
+    // Get a MinuteSynth network referenced from a Voice object:
+    const voice = ToneDefs.basicADSR.fn(msInstance)
+
+    // Activate 440 Hz for 3 seconds:
+    const now = msInstance.now()
+    voice.on(now, 440)
+    voice.off(now + 3)
+}
+    </script>	
+</head>
+<body>
+    <table>
+        <tr><td colspan=2><b>MinuteSynth Minimal Example</b></td></tr>
+        <tr><td><button onclick="play()">Play</button></td><td>Activate "basicADSR" patch</td></tr>
+    </table>
+</body>
+</html>
