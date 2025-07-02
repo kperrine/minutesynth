@@ -287,12 +287,15 @@ var M$ = (ac=new ACX(), U={}) => ($A(U, {
 
   // Prog (Program) orchestrates a series of values on a constant output that can be triggered.
   // Params: t: timesteps (seconds from trigger) array, v: values array, p: portamento (glide) time
-  Prog({ t, v, p = 0 }) {
-    let module = U.Freq(p);
+  Prog({ t, v, p=0 }) {
+    const module = U.Freq({p});
+    const origOnFn = module.on;
+    const origOffFn = module.off;
     module.on = (onTime, freq) => {
-      // TODO: Figure out if this will bind early.
-      t.forEach((time, i) => module.on(onTime + time, v[i]));
+      t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
+        : origOffFn.call(module, onTime + time));
     }
+    return module;
   },
 
   // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
@@ -324,14 +327,14 @@ var M$ = (ac=new ACX(), U={}) => ($A(U, {
       // on is called manually or by the Voice to set the next frequency.
       on(onTime, freq) {
         // TODO: Can we use setTarget with 0 time constant?
-        let Z = this;
+        const Z = this;
         if (Z._prevFreq && Z.p) {
           Z.v.t(freq, onTime, Z.p / 3);
         }
         else {
-          this.v.vT(freq, onTime);
+          Z.v.vT(freq, onTime);
         }
-        this._prevFreq = freq;
+        Z._prevFreq = freq;
       }
     };
 

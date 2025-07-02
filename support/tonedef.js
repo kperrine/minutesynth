@@ -238,13 +238,13 @@ const ToneDefs = {
       const voice = M$.Voice()
       const slide1 = M$.ADSR({ a: 2, b: 146, e: 78, s: 390, r: 1 }, voice)
       const adsr = M$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
-      const osc1 = M$.Osc({ t: 'sine', f: slide1, S: 1/2, g: adsr })
-      const noiseADSR = adsr = M$.ADSR({ D: 0.4, b: 0, e: 0.01, s: 0.05, a: 1, d: 0.1, r: 0.1, p: 0 }, voice)
+      const osc1 = M$.Osc({ t: M$.sine, f: slide1, S: 1/2, g: adsr })
+      const noiseADSR = M$.ADSR({ D: 0.4, b: 0, e: 0.01, s: 0.05, a: 1, d: 0.1, r: 0.1, p: 0 }, voice)
       const noise = M$.Noise({ g: noiseADSR })
       const distort = M$.Dist({ a: 4, r$: [osc1, noise], g: 4 })
-      const filterADSR = adsr = M$.ADSR({ D: 0.01, b: 2000, e: 50, s: 3200, a: 0.4, d: 0.1, r: 0.5, p: 0 }, voice)
+      const filterADSR = M$.ADSR({ D: 0.01, b: 2000, e: 50, s: 3200, a: 0.4, d: 0.1, r: 0.5, p: 0 }, voice)
   
-      const filter = M$.Filt({ t: 'highpass', f: filterADSR, q: 10, g: 0.65, r$: distort })
+      const filter = M$.Filt({ t: M$.highpass, f: filterADSR, q: 10, g: 0.65, r$: distort })
       const compress = M$.Comp({ g: 4, k: 4, r$: filter })
   
       compress.$(voice)
@@ -261,11 +261,11 @@ const ToneDefs = {
       const voice = M$.Voice()
       const slide1 = M$.ADSR({ a: 2, b: 146, e: 0.73, s: 1, r: 1 }, voice)
       const adsr = M$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
-      const osc1 = M$.Osc({ t: 'sine', f: slide1, S: 1/2, g: adsr })
+      const osc1 = M$.Osc({ t: M$.sine, f: slide1, S: 1/2, g: adsr })
       const distort = M$.Dist({ a: 55, r$: osc1, g: 1 })
-      const filterADSR = adsr = M$.ADSR({ D: 0.01, b: 1000, e: 100, s: 1000, a: 0.21, d: 0.1, r: 0.9, p: 0 }, voice) // change s for fun
+      const filterADSR = M$.ADSR({ D: 0.01, b: 1000, e: 100, s: 1000, a: 0.21, d: 0.1, r: 0.9, p: 0 }, voice) // change s for fun
 
-      const filter = M$.Filt({ t: 'highpass', f: filterADSR, q: 8, g: 0.65, r$: distort })
+      const filter = M$.Filt({ t: M$.highpass, f: filterADSR, q: 8, g: 0.65, r$: distort })
       const compress = M$.Comp({ g: 4, k: 4, r$: filter })
 
       compress.$(voice)
@@ -579,6 +579,72 @@ const ToneDefs = {
     },
     off: .8,
     rec: 2
+  },
+  program: {
+    fn: M$ => {
+      // Example of a triggered, programmed series of values. Note that this
+      // is not a recommended way to create a sequencer (e.g. you can't trigger
+      // an ADSR for each frequency value produced), but it is a great way
+      // to do things like arpeggios.
+
+      // Natural and sharp notes for working up frequencies:
+      const NOTES = { cN: 0, cS: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
+          gN: 7, gS: 8, aN: 9, aS: 10, bN: 11, cH: 12 }
+      const WHOLE_DUR = 0.5 // Duration for a whole note in seconds
+      const getFreqBase = (octave, offset) => 2**(((octave - 4) * 12 + offset) / 12)
+
+      // Our return object with trigger:
+      const voice = M$.Voice({ g: 0.7 })
+
+      // Resources for programmed frequencies:
+      const TONES = [
+          { freq: NOTES.cN, oct: 3, dur: 1/4 },
+          { freq: NOTES.eN, oct: 3, dur: 1/4 },
+          { freq: NOTES.cN, oct: 3, dur: 1/4 },
+          { freq: NOTES.gN, oct: 3, dur: 1/4 },
+          { freq: NOTES.cN, oct: 3, dur: 1/4 },
+          { freq: NOTES.cN, oct: 4, dur: 1/4 },
+          { freq: NOTES.bN, oct: 3, dur: 1/8 },
+          { freq: NOTES.aN, oct: 3, dur: 1/8 },
+          { freq: NOTES.gN, oct: 3, dur: 1/8 },
+          { freq: NOTES.aN, oct: 3, dur: 1/8 },
+          { freq: NOTES.gN, oct: 3, dur: 1/8 },
+          { freq: NOTES.fN, oct: 3, dur: 1/8 },
+          { freq: NOTES.eN, oct: 3, dur: 1/8 },
+          { freq: NOTES.fN, oct: 3, dur: 1/8 },
+          { freq: NOTES.eN, oct: 3, dur: 1/8 },
+          { freq: NOTES.dN, oct: 3, dur: 1/8 },
+          { freq: NOTES.cN, oct: 3, dur: 1/2 }
+      ]
+      let timePoint = -TONES[0].dur
+      const program = M$.Prog({
+          v: [ // Record all values; in this case, "frequency base" to signify note.
+              // Each "frequency base" will be multiplied below by the voice frequency
+              // generator to transpose to the key desired.
+              ...TONES.map(elem => getFreqBase(elem.oct, elem.freq))
+          ],
+          t: [ // Times to set all value changes:
+              ...TONES.map(elem => timePoint += elem.dur * WHOLE_DUR),
+          ]
+          // HINT: Add "p" parameter (e.g. p: 0.05) to glide between values!
+      })
+
+      // Resources for tone generation:
+      // First, we get our final frequency by multiplying the program's "frequency base"
+      // value with the frequency generator attached to voice.
+      const adjFreq = M$.Gain({ r$: program, g: voice.f })
+
+      // Next, tone generation, etc.
+      const tone = M$.Osc({ t: M$.triangle, f: adjFreq, g: 0.5 })
+      const adsr = M$.ADSR({ d: 5, s: 0 }, voice) // Quick onset, slow decay
+      const amp = M$.Gain({ r$: tone, g: adsr })
+      amp.$(voice) // Plug amp output into voice
+      voice.$(program) // Voice object triggers the program
+
+      return voice
+    },
+    off: 5,
+    rec: 5
   }
 }
 
