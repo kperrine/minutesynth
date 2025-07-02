@@ -2,9 +2,9 @@
 
 *"How it's pronounced is up to you!"*
 
-Version 0.95c
+Version 0.95d
 
-Copyright (C) Kenneth A. Perrine, 2024<br>
+Copyright (C) Kenneth A. Perrine, 2025<br>
 Please see LICENSE file for MIT License<br>
 http://www.academiken.com
 

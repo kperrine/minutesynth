@@ -230,9 +230,13 @@ These types of controls are available for most patchable parameters in MinuteSyn
 
 ## Coding Styles
 
-The examples in `support/tonedef.js` (viewable if you run `lab.html` locally in your web browser) show a variety of ways to build up synthesizer setups from MinuteSynth modules:
+The examples in [`support/tonedef.js`](../support/tonedef.js) (viewable if you run `lab.html` locally in your web browser) show a variety of ways to build up synthesizer setups from MinuteSynth modules:
 
 * Creation of `M$.Voice` is usually necessary early on because the module needs to be connected to others (e.g. `M$.ADSR`) to get the triggering action, and the frequency controller `.f` property serves as input (e.g. to `M$.Osc` `.f` patchable parameter)
 * It is possible to declare and reverse-patch modules at the same time using a series of declarations and the `r$:` parameter. Then, the final part is patched to `voice`. For example, see the `tonedef.js` preset "basicFM".
 * It is also possible to declare modules upfront, and then do most of the patching later. For example, see `tonedef.js` preset "basicFilter".
 * For more complex synth setups, for-loops can be used to repeat module creation and patching operations. For example, see `tonedef.js` preset "splash".
+
+## Minimal Runnable Example
+
+Please see the [`min_axample.html`](../min_example.html) file for a minimal example for initializing MinuteSynth, establishing a voice for a patch (drawing from one in `support/tonedef.js`), and playing it for 3 seconds.
