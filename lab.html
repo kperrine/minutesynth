@@ -120,7 +120,7 @@ const MAPPING = {cN: 0, cS: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
 
 let currentID = ""
 let activeID = ""
-let m$
+let synthInst
 let analyser
 let keyVoice
 let codeCache = ""
@@ -172,7 +172,7 @@ function createKeyVoice() {
     clearKeyVoice()
     if (voiceFunc) {
         try {
-            keyVoice = voiceFunc(m$)
+            keyVoice = voiceFunc(synthInst)
             checkKeyVoice()
         }
         catch (exc) {
@@ -185,11 +185,11 @@ function createKeyVoice() {
 
 function playKey(offset) {
     console.log(`Activating Key: ${offset}`)
-    if (!m$) {
+    if (!synthInst) {
         synthInit()
     }
-    if (m$.ac.state === "suspended") {
-        m$.ac.resume()
+    if (synthInst.ac.state === "suspended") {
+        synthInst.ac.resume()
     }
     if (!keyVoice) {
         createKeyVoice()
@@ -242,7 +242,7 @@ function keyZoneMovement(event) {
     currentID = ""
     if (underElement.id in MAPPING) {
         currentID = underElement.id
-        console.log(`KeyZoneMovement: currentID = ${currentID}`)
+        //console.log(`KeyZoneMovement: currentID = ${currentID}`)
     }
     if (currentID !== "") {
         if (activeID !== "" && activeID != currentID) {
@@ -326,7 +326,7 @@ function render(voiceName, voiceCode, sampleRate, recordLen, noteFreq, noteOff) 
 }
 
 function recPlay() {
-    if (!m$) {
+    if (!synthInst) {
         synthInit();
     }
 
@@ -355,8 +355,8 @@ function init() {
 }
 
 function synthInit() {
-    m$ = M$();
-    analyser = m$.ac.createAnalyser();
+    synthInst = MinuteSynth();
+    analyser = synthInst.ac.createAnalyser();
     analyser.minDecibels = -90;
     analyser.maxDecibels = -10;
     analyser.smoothingTimeConstant = 0.65;
