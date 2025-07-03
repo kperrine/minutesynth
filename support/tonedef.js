@@ -645,6 +645,24 @@ const ToneDefs = {
     },
     off: 5,
     rec: 5
+  },
+  engine: {
+    fn: M$ => {
+      const voice = M$.Voice()
+      const amp = M$.Gain()
+      for (let i = 0; i < 20; i++) {
+        // TODO: Put in a mathy way of producing freqs deterministically, likely involving a modulo:
+        let osc = M$.Osc({ t: M$.sawtooth, f: Math.random() * 1170 + 30, g: Math.random() * 0.2 + 0.1 })
+        osc.$(amp)
+      }
+      const adsr = M$.ADSR({ b: 100, a: 8, e: 800, s: 1000, d: 6 }, voice)
+      const filter = M$.Filt({ t: M$.bandpass, q: 10, f: adsr, S: 2, g: 3, r$: amp })
+      const finalAmp = M$.Gain({ g: M$.ADSR({ b: 0.1, a: 6 }, voice), r$: filter })
+      finalAmp.$(voice)
+      return voice
+    },
+    off: 10,
+    rec: 10
   }
 }
 
