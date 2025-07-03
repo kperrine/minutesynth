@@ -2,7 +2,7 @@
 
 As in the README...
 
-This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was more compact than WebAudio itself could offer, and to add extra bits of functionality. It was used by Neurolyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds in the repo's lab.html at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
+This is a small-scale front-end for working with the WebAudio library found in modern web browsers. The motivation for creating this was to leverage the powerful features of WebAudio in a form that was more compact than WebAudio itself could offer, and to add extra bits of functionality. It was used by Neuralyte in a couple of 64K JavaScript demo projects. The pluggable design was helpful for tinkering with sounds in the repo's lab.html at the barest minimum of overhead. The library's terseness helped in whipping up code quickly and estimating final code size. After minifying, it was remarkably small.
 
 ## Modules
 
@@ -18,6 +18,10 @@ The next section explains further.
 
 Most of the modules follow these patterns:
 
+* You must instanciate your own synthesizer. By default, the synth output is the default audio context. Example:
+  ```javascript
+  const M$ = MinuteSynth()
+  ```
 * A module is created by calling a module name with a set of parameters:
   ```javascript
   // Create a sinewave with a fixed frequency of 600 Hz
@@ -89,7 +93,7 @@ Most of the modules follow these patterns:
 
 Other esoteric details:
 
-* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can take a string literal for the corresponding AudioNode (e.g. `'sine'`), take the M$ convenience attribute (e.g. `M$.sine`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Reference](reference.md#osc-oscillator) for more info.
+* The "type" parameter `.t` on Oscillators and Filters (`M$.Osc` and `M$.Filt`) can take a string literal for the corresponding AudioNode (e.g. `'sine'`), take the MinuteSynth object convenience attribute (e.g. `M$.sine`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Reference](reference.md#osc-oscillator) for more info.
   ```javascript
   // String:
   let sinewave = M$.Osc({ t: 'sine', f: 100, g: 1/4 })

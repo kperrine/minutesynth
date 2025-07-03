@@ -40,10 +40,10 @@ This creates a couple global helper functions and also the `M$` MinuteSynth fact
 ## Instanciation
 
 ```javascript
-M$(ac = DEFAULT_AUDIOCONTEXT)
+const M$ = MinuteSynth(ac = DEFAULT_AUDIOCONTEXT)
 ```
 
-Create an instance of MinuteSynth that's bound to your `AudioContext` by calling `M$()`. (You can specify your own, or leave undefined to use the default one that goes to your platform's sound output). The object that is created is then a factory object that allows you to create all MinuteSynth modules.
+Create an instance of MinuteSynth that's bound to your `AudioContext` by calling `MinuteSynth()`. (You can specify your own, or leave undefined to use the default one that goes to your platform's sound output). The object that is created is then a factory object that allows you to create all MinuteSynth modules.
 
 Note that you may need to do this from within a click or other type of window interaction handler for the web browser to let you generate sound.
 
@@ -315,7 +315,7 @@ The MinuteSynth `$M` object also contains a couple of extra methods that are use
 
 ## Helper Functions
 
-When `minutesynth.js` is included into HTML, a couple of global helper functions are created.
+A couple of internal helper functions are in `minutesynth.js`. You can expose and reuse them if you find them handy:
 
 **`$A(source, target)`:** Assign: Copies contents of `source` to `target` and returns result. It is used to allow shorthand late-binding self-references from within objects by calling `Object.assign()`.
 
