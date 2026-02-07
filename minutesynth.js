@@ -1,7 +1,382 @@
 "use strict";
 
 // Universal audio cotext reference:
-var ACX = window.AudioContext || window.webkitAudioContext;
+
+// ACX is a reference to the AudioContext class, for creating AudioContext objects.
+var ACX = window.AudioContext || window.webkitAudioContext
+
+class MinuteSynth {
+  /**
+   * Returns a random number, by default in [-1, 1]:
+   * @param {number} m - Range of random number (default: 2)
+   * @param {number} a - Offset of random number (default: -1)
+   * @returns {number} A random number within the specified range and offset.
+   */
+  static #random (m = 2, a = -1) {
+    return Math.random() * m + a
+  }
+
+  /**
+   * Calls the given function f on the input a or each element of the input
+   * if a is an array:
+   * @param {any|any[]} a - The input value or array of values.
+   * @param {function} f - The function to apply to each element.
+   * @returns {any[]} The result of applying the function to each element.
+   */
+  static #apply (a, f) {
+    return [].concat(a).forEach(element => f(element))
+  }
+
+  // Represents Attack, Decay, Sustain, Release parameterized curve.
+  // The default ADSR lets the tone stay on until it is shut off.
+  static ADSR = class {
+    /**
+     * Creates an ADSR (Attack, Decay, Sustain, Release) parameterization
+     * @param {number} D - start delay for attack
+     * @param {number} b - base value (= "off" value)
+     * @param {number} e - attack arrival value
+     * @param {number} a - attack time (time to go from b to e)
+     * @param {number} d - decay time (time to go from e to s)
+     * @param {number} s - sustain value (after the attack-decay sequence
+     * @param {number} r - release time (from s to b, occurring when triggerOff() is called)
+     * @param {number} p - auto-pulse-- if nonzero, automatically does a triggerOff p seconds after triggerOn.
+     */     
+    constructor({ D = 0, b = 0, e = 1, a = 1e-3, d = 0, s = 1, r = 0, p = 0 } = {}) {
+      Object.assign(this, { D, b, e, a, d, s, r, p })
+    }
+  }
+
+  // Sample rate that is provided by the AudioContext. By default, it is 44100 Hz.
+  sampleRate
+
+  // Length of noise sample in seconds. This would be seconds * sampleRate samples.
+  NOISE_LEN = 1.0
+
+  // AudioContext object that is to be used to produce WebAudio objects.
+  audioContext
+
+  /**
+   * Constructs a MinuteSynth instance tied to the given AudioContext.
+   * @param {AudioContext} ac - The AudioContext to use (default: new AudioContext()).
+   */
+  constructor(ac = new ACX()) {
+    this.audioContext = ac
+    this.sampleRate = ac.sampleRate
+  }
+
+  // Base return type for MinuteSynth modules that expose a series of patchable
+  // parameters
+  SynthModule = class {
+
+
+
+
+    constructor() {
+      const meModule = this
+      this._params = {} // String (including 'in') => ParamA.
+
+      this._Param = class {
+        /** @type {SynthModule} */
+        _module
+
+        /** @type {SynthModule[]} */
+        _inModules
+
+        /**
+         * Cretes a parameter that allows for attachment to another module
+         * @param {string} name 
+         * @param {AudioParam} obj 
+         * @param {number | string} defVal 
+         */
+        constructor(name, obj, defVal) {
+          this._name = name
+          this._obj = obj
+          this._module = meModule
+          this._defVal = defVal
+          this._inModules = []
+        }
+
+        /**
+         * "Reverse attach:" Attach a source module to this parameter. If it is a Voice,
+         * then register the voice.
+         * @param {SynthModule | SynthModule[]} srcModules
+         * @return {_Param} The current parameter object, to allow for chaining.
+         */  
+        r$(srcModules) {
+          for (let module of [].concat(srcModules)) {
+            this._inModules.push(module)
+            if (module._$(this._obj)) {
+              this.z0 && this.z0()
+            }
+          }
+          return this;
+        }
+
+        /**
+         * Remove an incoming connection by incoming module reference, or all if no parameter specified
+         * @param {SynthModule | null | undefined} inModule 
+         */
+        detach(inModule) {
+          for (let module of [...this._inModules]) { // Iterate over copy
+            if (!inModule || (module == inModule)) {
+              [].concat(this._obj).forEach(obj => module.out.detach(obj));
+              this._inModules.splice(this._inModules.indexOf(inModule), 1);
+            }
+          }
+        }
+      }
+
+      this._ParamValue = class extends _Param {
+        /**
+         * Cretes a parameter that represents a time-varying value
+         * @param {string} name 
+         * @param {AudioParam} obj 
+         * @param {number | string} defVal 
+         */
+        constructor(name, obj, defVal) {
+          super(name, obj, defVal)
+        }
+
+        vC(value) {
+          this._obj.value = value;
+        }
+
+        vT(value, startTime) {
+          this._obj.setValueAtTime(value, startTime);
+        }
+
+        lT(value, endTime) {
+          this._obj.linearRampToValueAtTime(value, endTime);
+        }
+
+        eT(value, endTime) {
+          this._obj.exponentialRampToValueAtTime((Math.abs(value) < 1e-4) ? 1e-4 : value, endTime);
+        }
+
+        t(value, startTime, tc) { // tc: Use 1/3 for 95% over 1 sec.
+          this._obj.setTargetAtTime(value, startTime, tc);
+        }
+        
+        cv(values, startTime, dur) {
+          this._obj.setValueCurveAtTime(values, startTime, dur);
+        }
+        
+        c(startTime) {
+          this._obj.cancelScheduledValues(startTime);
+        }
+
+        h(holdTime) {
+          this._obj.cancelAndHoldAtTime(holdTime);
+        }
+
+        z0() {
+          this.vC(0);
+        }
+      }
+
+      // ParamAudio allows access for audio inputs to a module.
+      _ParamAudio: (obj, module, defVal, paramName='in') => ({
+        ...U._Param(paramName, obj, module, defVal),
+        z0() {
+          obj.value = 0;
+        }
+      }),
+
+      // ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
+      // -1 to defer starting, 0 to autostart now, and other to start at specified time.
+      _ParamStart (obj, module, startTime, defVal) {
+        let ret = {
+          ...U._Param('s', obj, module, defVal),
+          go(startTime) {
+            obj.start(startTime);
+          },
+          no(stopTime) {
+            obj.stop(stopTime);
+            // TODO: Consider scheduling an object kill() at stopTime
+          }
+        };
+        if (startTime != -1) {
+          ret.go((startTime == 0) ? U.now() : startTime);
+        }
+        return ret;
+      }
+
+
+    }
+
+    _ModuleBase: () => ({
+      _params: {}, // String (including 'in') => ParamA.
+      /*
+      outParams: [], // Param
+      */
+      // +out (AudioNode)
+
+      // Attaches this module to a parameter (or main input) of a downstream module. tgtThing can either be
+      // a Module or a Param.
+      $ (tgtThing, tgtParamName) {
+        // TODO: Add option to inherit parameters from target, if target is a module. Don't copy "in", and
+        // if param exists in this, add index to it, e.g. "g2". That would allow for easier manipulation
+        // of params from one location.
+        // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
+        let param = tgtThing;
+        if (tgtThing._params) {
+          param = tgtThing._params[tgtParamName || 'in'];
+        }
+        param.r$(this);
+        /*
+        this.outParams.push(param);
+        */
+        return tgtThing; // Allows chaining of commands
+      },
+
+      // r$ is a "reverse attach", which will allow one or more source modules to attach to this module:
+      r$ (srcModules, thisParamName) {
+        $Y(srcModules, module => module.$(this, thisParamName));
+        return this;
+      },
+
+      // _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
+      // connection. Return a nonzero to automatically remove values from input.
+      _$ (targetObj) {
+        this.z.connect(targetObj);
+        return 1;
+      },
+
+      /*
+      detach(tgtModule, paramName) {
+        let arr = this.outParams;
+        for (let param in [...arr]) {
+          if (!tgtModule || (param.base == tgtModule)) {
+            if (!paramName || (param.name == paramName)) {
+              param.detach(this);
+              arr.splice(arr.indexOf(param), 1);
+            }
+          }
+        }
+      },
+      kill() {
+        this.detach();
+      },
+      */
+      _addParam (param) {
+        this._params[param._name] = param;
+        this[param._name] = param;
+        if (!isNaN(param._defVal)) {
+          // Assign number:
+          param.vC(param._defVal);
+        }
+        else if (param._defVal) {
+          // Assign module(s):
+          $Y(param._defVal, defVal => defVal.$(param));
+        }
+        //return param;
+      },
+      _addFreqHelper (control, defFreq=0) {
+        let Z = this;
+        control.value = 0;
+        Z._S = U.Gain();
+        if (!isNaN(defFreq)) {
+          // If the default value is a number, then create a constant for it:
+          Z._C = U.C(defFreq);
+          // TODO: Inherit the parameters rather than recreating.
+          Z._addParam(U._ParamValue('f', Z._C.z.offset, Z, defFreq));
+          Z._C.$(Z._S);
+        }
+        else {
+          // TODO: Inherit the parameters rather than recreating.
+          Z._addParam(U._ParamValue('f', Z._S.z, Z, defFreq));
+        }
+        Z._addParam(U._ParamValue('S', Z._S.z.gain, Z, Z._calcSCRate(1)));
+        Z._S.z.connect(control);
+      }
+    }),
+
+
+
+
+    /**
+     * _addParam adds a parameter to the module, making it accessible by name and also
+     * @param {*} param - 
+     */
+    _addParam(param) {
+      // !!! AI MADE THIS !!!
+      this._params[param._name] = param
+      this[param._name] = param
+      if (!isNaN(param._defVal)) {
+        // Assign number:
+        param.vC(param._defVal)
+      }
+      else if (param._defVal) {
+        // Assign module(s):
+        MinuteSynth.#apply(param._defVal, defVal => defVal.$(param))
+      }
+    }
+  }
+
+  // Returns a ParamValue object for the given name, value, and module.
+  ParamValue (name, node, defVal) {
+    // !!! AI MADE THIS !!!
+    const p = new ParamValue(name, node, defVal)
+    p._module = this
+    return p
+  }
+
+  BaseAmp = class extends SynthModule {
+    constructor(gainVal = 1) {
+      super()
+      this.z = this.audioContext.createGain()
+      this._addParam(this.ParamValue('g', this.z.gain, gainVal))
+    }
+  }
+
+  // Convenience/clarity constants for t: type:
+  static WaveType = Object.freeze({
+    SINE: 1,
+    SQUARE: 2,
+    SAWTOOTH: 3,
+    TRIANGE: 4,
+    CUSTOM: 5
+  })
+
+  /**
+   * Osc (Oscillaor) is a simple tone generator. Specify its type and also
+   * scale, which can transform the incoming base frequency when the module is
+   * triggered. Specify r and i arrays for periodic wave.
+   * @param {WaveType | number} t - Type of waveform
+   * @param {number} S - scale (default: 1)
+   * @param {number} f - default frequency
+   * @param {number} d - detune (default: 0)
+   * @param {number} g - gain (default: 1)
+   * @param {number} s - start time;
+   * @param {Float32Array} r - real values;
+   * @param {Float32Array} i - imag. values,
+   * @param {number} n - nominal playback frequncy (for custom waveform)
+   * @returns {SynthModule} An instance of an oscillator module.
+   */
+  Osc ({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
+    const module = {
+      ...U._ModuleBaseAmp(g),
+      o: ac.createOscillator(),
+      _calcSCRate: freq => freq * S / n
+    };
+    if (t) {
+      module.o.type = isNaN(t) ? t : ['sine', 'square', 'sawtooth', 'triangle', 'custom'][t - 1];
+    }
+    if (r) {
+      module.o.setPeriodicWave(ac.createPeriodicWave(r, i));
+    }
+    module._addParam(U._ParamStart(module.o, module, s));
+    module._addParam(U._ParamValue('d', module.o.detune, module, d));
+    module._addFreqHelper(module.o.frequency, f);
+    module.o.connect(module.z);
+    return module;
+  }
+
+
+
+}
+
+
 
 // MinuteSynth module that specifies and produces objects tied to the given AudioContext.
 const MinuteSynth = (() => {
@@ -402,126 +777,6 @@ const MinuteSynth = (() => {
     /*
     * Primitives and bases:
     */
-    _ModuleBase: () => ({
-      _params: {}, // String (including 'in') => ParamA.
-      /*
-      outParams: [], // Param
-      */
-      // +out (AudioNode)
-
-      // Attaches this module to a parameter (or main input) of a downstream module. tgtThing can either be
-      // a Module or a Param.
-      $ (tgtThing, tgtParamName) {
-        // TODO: Add option to inherit parameters from target, if target is a module. Don't copy "in", and
-        // if param exists in this, add index to it, e.g. "g2". That would allow for easier manipulation
-        // of params from one location.
-        // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
-        let param = tgtThing;
-        if (tgtThing._params) {
-          param = tgtThing._params[tgtParamName || 'in'];
-        }
-        param.r$(this);
-        /*
-        this.outParams.push(param);
-        */
-        return tgtThing; // Allows chaining of commands
-      },
-
-      // r$ is a "reverse attach", which will allow one or more source modules to attach to this module:
-      r$ (srcModules, thisParamName) {
-        $Y(srcModules, module => module.$(this, thisParamName));
-        return this;
-      },
-
-      // _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
-      // connection. Return a nonzero to automatically remove values from input.
-      _$ (targetObj) {
-        this.z.connect(targetObj);
-        return 1;
-      },
-
-      /*
-      detach(tgtModule, paramName) {
-        let arr = this.outParams;
-        for (let param in [...arr]) {
-          if (!tgtModule || (param.base == tgtModule)) {
-            if (!paramName || (param.name == paramName)) {
-              param.detach(this);
-              arr.splice(arr.indexOf(param), 1);
-            }
-          }
-        }
-      },
-      kill() {
-        this.detach();
-      },
-      */
-      _addParam (param) {
-        this._params[param._name] = param;
-        this[param._name] = param;
-        if (!isNaN(param._defVal)) {
-          // Assign number:
-          param.vC(param._defVal);
-        }
-        else if (param._defVal) {
-          // Assign module(s):
-          $Y(param._defVal, defVal => defVal.$(param));
-        }
-        //return param;
-      },
-      _addFreqHelper (control, defFreq=0) {
-        let Z = this;
-        control.value = 0;
-        Z._S = U.Gain();
-        if (!isNaN(defFreq)) {
-          // If the default value is a number, then create a constant for it:
-          Z._C = U.C(defFreq);
-          // TODO: Inherit the parameters rather than recreating.
-          Z._addParam(U._ParamValue('f', Z._C.z.offset, Z, defFreq));
-          Z._C.$(Z._S);
-        }
-        else {
-          // TODO: Inherit the parameters rather than recreating.
-          Z._addParam(U._ParamValue('f', Z._S.z, Z, defFreq));
-        }
-        Z._addParam(U._ParamValue('S', Z._S.z.gain, Z, Z._calcSCRate(1)));
-        Z._S.z.connect(control);
-      }
-    }),
-    _Param: (_name, _obj, _module, _defVal) => ({
-      /*
-      inModules: [], // Module
-      */
-      _name,
-      _obj, // AudioParam
-      _module,
-      _defVal,
-
-      // "Reverse attach:" Attach a source module to this parameter. If it is a Voice,
-      // then register the voice.
-      r$(srcModules) {
-        for (let module of [].concat(srcModules)) {
-          /*
-          this.inModules.push(inModule);
-          */
-          if (module._$(this._obj)) {
-            this.z0 && this.z0();
-          }
-          //[].concat(this._obj).forEach(obj => srcModule.z.connect(obj));
-        }
-        return this;
-      }/*,
-      detach(inModule) {
-        let arr = this.inModules;
-        for (let module in [...arr]) { // Iterate over copy
-          if (!inModule || (module == inModule)) {
-            [].concat(this.obj).forEach(obj => module.out.detach(obj));
-            arr.splice(arr.indexOf(inModule), 1);
-          }
-        }
-      }
-      */
-    }),
 
     /*
     * Intermediate building-blocks:
