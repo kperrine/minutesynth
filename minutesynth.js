@@ -32,8 +32,8 @@ class MinuteSynth {
 */
 
   // Represents Attack, Decay, Sustain, Release parameterized curve.
-  // The default ADSR lets the tone stay on until it is shut off.
-  static ADSR = class {
+  // The default ADSR parameters lets the tone stay on until it is shut off.
+  static ADSRParams = class {
     /**
      * Creates an ADSR (Attack, Decay, Sustain, Release) parameterization
      * @param {number} D - start delay for attack
@@ -49,6 +49,8 @@ class MinuteSynth {
       Object.assign(this, { D, b, e, a, d, s, r, p })
     }
   }
+
+  static _DEFAULT_ADSR = new MinuteSynth.ADSRParams()
 
   /**
    * Sample rate that is provided by the AudioContext. By default, it is 44100 Hz.
@@ -175,11 +177,17 @@ class MinuteSynth {
 
     /**
      * A "reverse attach", which will allow one or more source modules to attach to this module
-     * @param {MinuteSynth.SynthModule | MinuteSynth.SynthModule[]} srcModules - The source module(s) to attach.
+     * @param {number | MinuteSynth.SynthModule | []} srcModules - The source module(s) to attach.
      * @param {string} thisParamName - Parameter name to attach to if this module has multiple parameters. Defaults to "in".
      */
     r$(srcModules, thisParamName) {
-      [].concat(srcModules).forEach(module => module.$(this, thisParamName))
+      [].concat(srcModules).forEach(module => {
+        if (!isNaN(module)) {
+          // If the source module is a number, then wrap it in a "C" module:
+          module = this.minuteSynth.C(module)
+        }
+        module.$(this, thisParamName)
+      })
       return this
     }
 
@@ -288,11 +296,14 @@ class MinuteSynth {
     /**
      * "Reverse attach:" Attach a source module to this parameter. If it is a Voice,
      * then register the voice.
-     * @param {MinuteSynth.SynthModule | MinuteSynth.SynthModule[]} srcModules
+     * @param {number | MinuteSynth.SynthModule | []} srcModules
      * @return {MinuteSynth._Param} The current parameter object, to allow for chaining.
      */  
     r$(srcModules) {
       for (let module of [].concat(srcModules)) {
+        if (!isNaN(module)) {
+          module = this.synthModule.minuteSynth.C(module)
+        }
         this._inModules.push(module)
         if (module._$(this._obj)) {
           this.z0 && this.z0()
@@ -429,9 +440,9 @@ class MinuteSynth {
    * triggered. Specify r and i arrays for periodic wave.
    * @param {WaveType | number | string} t - Type of waveform
    * @param {number} S - scale (default: 1)
-   * @param {number | MinuteSynth.SynthModule} f - default frequency
-   * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
-   * @param {number | MinuteSynth.SynthModule} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} f - default frequency
+   * @param {number | MinuteSynth.SynthModule | []} d - detune (default: 0)
+   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
    * @param {number} s - start time;
    * @param {Float32Array} r - real values;
    * @param {Float32Array} i - imag. values,
@@ -439,7 +450,7 @@ class MinuteSynth {
    * @returns {MinuteSynth.SynthModule} An instance of an oscillator module
    */
   Osc({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
-    const module = class Osc extends this._BaseAmp {
+    const Module = class Osc extends this._BaseAmp {
       o = this.audioContext.createOscillator()
       _calcSCRate = freq => freq * S / n
 
@@ -457,7 +468,7 @@ class MinuteSynth {
         this.o.connect(this.z)
       }
     }
-    return new module()
+    return new Module()
   }
 
   /**
@@ -466,16 +477,16 @@ class MinuteSynth {
    * @param {number} T - duration of the buffer in seconds (default: 1)
    * @param {number} c - number of channels (default: 1)
    * @param {number} S - scale (default: 1)
-   * @param {number | MinuteSynth.SynthModule} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
    * @param {number} s - start time (default: 0)
    * @param {number} F - sampling rate (default: AudioContext's sample rate)
-   * @param {number | MinuteSynth.SynthModule} r - playback rate (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} r - playback rate (default: 1)
    * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
    * @param {number} n - nominal playback frequency (0 for no freq. control)
    * @returns {MinuteSynth.SynthModule} An instance of a buffer module
    */
   Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0, f }) {
-    const module = class Buf extends this._BaseAmp {
+    const Module = class Buf extends this._BaseAmp {
       b = this.audioContext.createBuffer(c, ~~(F * T), F)
       B = this.audioContext.createBufferSource()
       T = T
@@ -506,15 +517,15 @@ class MinuteSynth {
         this.B.loop = loop
       }
     }      
-    return module
+    return new Module()
   }
 
   /**
    * Noise produces a playable buffer of noise.
-   * @param {number | MinuteSynth.SynthModule} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
    * @param {number} s - start time (default: 0)
-   * @param {number | MinuteSynth.SynthModule} r - playback rate (default: 1)
-   * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
+   * @param {number | MinuteSynth.SynthModule | []} r - playback rate (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} d - detune (default: 0)
    * @returns {MinuteSynth.SynthModule} An instance of a noise module
    */
   Noise({ g = 1, s = 0, r, d } = {}) {
@@ -618,76 +629,94 @@ class MinuteSynth {
       return module;
     },
 
-    // C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
-    C (v=0) {
-      let module = {
-        ...U._ModuleBase(),
-        z: ac.createConstantSource()
-      };
-      module._addParam(U._ParamValue('v', module.z.offset, module, v));
-      module.z.start();
-      return module;
-    },
+  /**
+   * C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
+   * @param {number | MinuteSynth.SynthModule | []} v - The initial value of the constant (default: 0).
+   * @return {MinuteSynth.SynthModule} An instance of a constant source module.
+   */
+  C(v = 0) {
+    const Module = class C extends this._SynthModule {
+      z = this.audioContext.createConstantSource()
 
-    // Gain (Amplifier) is a very simple module that acts as a multiplier.
-    // Params: g: gain value; r$: input
-    Gain ({ g=1, r$ } = {}) {
-      let module = U._ModuleBaseAmp(g);
-      module._addParam(U._ParamAudio(module.z, module, r$));
-      return module;
-    },
+      constructor() {
+        super()
+        this._addParam(new this._ParamValue('v', this.z.offset, this, v))
+        this.z.start()
+      }
+    }
+    return new Module()
+  }
 
-    // mA (makeADSR) assists in creating ADSR parameters by filling in the defaults.
-    mA: adsr => ({ ...U._DEFAULT_ADSR, ...adsr }),
+  /**
+   * Gain (Amplifier) is a very simple module that acts as a multiplier.
+   * @param {number | MinuteSynth.SynthModule | []} g - The gain value (default: 1).
+   * @param {number | MinuteSynth.SynthModule | []} r$ - Optional input to be connected to the gain parameter.
+   * @return {MinuteSynth.SynthModule} An instance of a gain module.
+   */
+  Gain({ g = 1, r$ } = {}) {
+    const Module = class Gain extends this._BaseAmp {
+      constructor() {
+        super(g)
+        this._addParam(new this._ParamAudio(this.z, this, r$))
+      }
+    }
+    return new Module()
+  }
 
-    // ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
-    // can allow values to ramp up and down whenever the module is triggered. Use the t$ 
-    // (second parameter) to reverse-bind a trigger.
-    ADSR (adsr=U._DEFAULT_ADSR, t$) {
-      let module = {
-        ...U.C(),
-        a: U.mA(adsr),
-        _offState: true,
-        _newState: true,
+  /**
+   * ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
+   * can allow values to ramp up and down whenever the module is triggered. Use the t$ 
+   * (second parameter) to reverse-bind a trigger.
+   * @param {MinuteSynth.ADSRParams | object} adsr - The ADSR parameters to use for this module (default: U._DEFAULT_ADSR).
+   * @param {MinuteSynth.SynthModule | undefined} t$ - Optional trigger input for this module.
+   * @returns {MinuteSynth.SynthModule} An instance of an ADSR module.
+   */
+  ADSR (adsr = {}, t$) {
+    const Module = class ADSR extends this._SynthModule {
+      a = { ...this._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
+      _offState = true
+      _newState = true
+      
+      constructor() {
+        super()
 
-        // on is called manually or by the Voice to engage the ADSR action (attack, decay,
-        // sustain).
-        on (onTime, freq) {
-          const Z = this;
-          if (Z._newState) {
-            Z.v.vT(Z.a.b, onTime);
-            Z._newState = false;
-          }
-          else {
-            Z.v.c(onTime + Z.a.D);
-          }
-          Z.v.t(Z.a.e, onTime + Z.a.D, Z.a.a / 3);
-          Z.v.t(Z.a.s, onTime + Z.a.D + Z.a.a, Z.a.d / 3);
-          Z._offState = false;
-          if (Z.a.p) {
-            Z.off(onTime + Z.a.p);
-          }
-        },
+        // Allow for triggering via a similar mechanism as used for connecting audio:
+        this._addParam(new this._ParamAudio(this, this, t$))
+      }
 
-        // triggerOff will cause the ADSR action to conclude (release).
-        off (offTime) {
-          const Z = this;
-          if (Z._offState) {
-            Z.v.vT(Z.a.b, offTime);
-          }
-          else {
-            Z.v.c(offTime); // if note duration is shorter than A + D.
-            Z.v.t(Z.a.b, offTime, Z.a.r / 3);
-            //Z.v.vT(Z.a.b, offTime + Z.a.r + 6); // Force zero because t doesn't get there.
-            Z._offState = true;
-          }
+      // on is called manually or by the Voice to engage the ADSR action (attack, decay,
+      // sustain).
+      on (onTime, freq) {
+        if (this._newState) {
+          this.v.vT(this.a.b, onTime)
+          this._newState = false
         }
-      };
+        else {
+          this.v.c(onTime + this.a.D)
+        }
+        this.v.t(this.a.e, onTime + this.a.D, this.a.a / 3)
+        this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
+        this._offState = false
+        if (this.a.p) {
+          this.off(onTime + this.a.p)
+        }
+      }
 
-      // Allow for triggering via a similar mechanism as used for connecting audio:
-      module._addParam(U._ParamAudio(module, module, t$));
-      return module;
-    },
+      // triggerOff will cause the ADSR action to conclude (release).
+      off (offTime) {
+        if (this._offState) {
+          this.v.vT(this.a.b, offTime)
+        }
+        else {
+          this.v.c(offTime) // if note duration is shorter than A + D.
+          this.v.t(this.a.b, offTime, this.a.r / 3)
+          //Z.v.vT(Z.a.b, offTime + Z.a.r + 6) // Force zero because t doesn't get there.
+          this._offState = true
+        }
+      }
+    }
+    return new Module()
+  }
 
     // Prog (Program) orchestrates a series of values on a constant output that can be triggered.
     // Params: t: timesteps (seconds from trigger) array, v: values array, p: portamento (glide) time
