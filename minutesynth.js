@@ -243,20 +243,20 @@ class MinuteSynth {
      */
     _addFreqHelper(control, defFreq = 0) {
       control.value = 0;
-      this._S = U.Gain();
+      this._S = U.Gain()
       if (!isNaN(defFreq)) {
         // If the default value is a number, then create a constant for it:
-        this._C = U.C(defFreq);
+        this._C = U.C(defFreq)
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(U._ParamValue('f', this._C.z.offset, this, defFreq));
-        this._C.$(this._S);
+        this._addParam(U._ParamValue('f', this._C.z.offset, this, defFreq))
+        this._C.$(this._S)
       }
       else {
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(U._ParamValue('f', this._S.z, this, defFreq));
+        this._addParam(U._ParamValue('f', this._S.z, this, defFreq))
       }
-      this._addParam(U._ParamValue('S', this._S.z.gain, this, this._calcSCRate(1)));
-      this._S.z.connect(control);
+      this._addParam(U._ParamValue('S', this._S.z.gain, this, this._calcSCRate(1)))
+      this._S.z.connect(control)
     }
   }
 
@@ -427,23 +427,24 @@ class MinuteSynth {
    * Osc (Oscillaor) is a simple tone generator. Specify its type and also
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
-   * @param {WaveType | number} t - Type of waveform
+   * @param {WaveType | number | string} t - Type of waveform
    * @param {number} S - scale (default: 1)
-   * @param {number} f - default frequency
-   * @param {number} d - detune (default: 0)
-   * @param {number} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule} f - default frequency
+   * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
+   * @param {number | MinuteSynth.SynthModule} g - gain (default: 1)
    * @param {number} s - start time;
    * @param {Float32Array} r - real values;
    * @param {Float32Array} i - imag. values,
    * @param {number} n - nominal playback frequncy (for custom waveform)
-   * @returns {SynthModule} An instance of an oscillator module.
+   * @returns {MinuteSynth.SynthModule} An instance of an oscillator module
    */
   Osc({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
     const module = class Osc extends this._BaseAmp {
       o = this.audioContext.createOscillator()
+      _calcSCRate = freq => freq * S / n
+
       constructor() {
         super(g)
-        this._calcSCRate = freq => freq * S / n
         if (t) {
           this.o.type = isNaN(t) ? t : ['sine', 'square', 'sawtooth', 'triangle', 'custom'][t - 1]
         }
@@ -459,84 +460,103 @@ class MinuteSynth {
     return new module()
   }
 
+  /**
+   * Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
+   * the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
+   * @param {number} T - duration of the buffer in seconds (default: 1)
+   * @param {number} c - number of channels (default: 1)
+   * @param {number} S - scale (default: 1)
+   * @param {number | MinuteSynth.SynthModule} g - gain (default: 1)
+   * @param {number} s - start time (default: 0)
+   * @param {number} F - sampling rate (default: AudioContext's sample rate)
+   * @param {number | MinuteSynth.SynthModule} r - playback rate (default: 1)
+   * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
+   * @param {number} n - nominal playback frequency (0 for no freq. control)
+   * @returns {MinuteSynth.SynthModule} An instance of a buffer module
+   */
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0, f }) {
+    const module = class Buf extends this._BaseAmp {
+      b = this.audioContext.createBuffer(c, ~~(F * T), F)
+      B = this.audioContext.createBufferSource()
+      T = T
+      F = F
+      N = ~~(F * T)
+      _calcSCRate = freq => freq * S * T
 
-    // Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
-    // the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
-    // Params: T: duration; c: channels; S: scale; g: gain; s: start time; F: sampling rate
-    //         r: playback rate; d: detune; n: nominal playback frequency (0 for no freq. control)
-    Buf ({ T=1, c=1, S=1, g=1, s=0, F=U.SR, r=1, d, n=0, f }) {
-      const module = {
-        ...U._ModuleBaseAmp(g),
-        b: ac.createBuffer(c, ~~(F * T), F),
-        B: ac.createBufferSource(),
-        T,
-        F,
-        N: ~~(F * T),
-        mem (chan=0) {
-          return this.b.getChannelData(chan);
-        },
-        lock (loop = true) {
-          this.B.buffer = this.b;
-          this.B.loop = loop;
-        },
+      constructor() {
+        super(g)
+        this._addParam(new this._ParamStart(this.B, this, s))
+        this._addParam(new this._ParamValue('d', this.B.detune, d))
+        if (n) {
+          this._addFreqHelper(this.B.playbackRate, f)
+        }
+        else {
+          this._addParam(new this._ParamValue('r', this.B.playbackRate, r))
+        }
+        this.B.connect(this.z)
         // TODO: n isn't used except for determing if we are frequency controlled.
-        _calcSCRate: freq => freq * S * T
-      };
-      module._addParam(U._ParamStart(module.B, module, s));
-      module._addParam(U._ParamValue('d', module.B.detune, module, d));
-      if (n) {
-        module._addFreqHelper(module.B.playbackRate, f);
       }
-      else {
-        module._addParam(U._ParamValue('r', module.B.playbackRate, module, r));
-      }
-      module.B.connect(module.z);
-      return module;
-    },
 
-    // Noise produces a playable buffer of noise.
-    // Params: g: gain; s: start time
-    Noise ({ g=1, s=0, r, d } = {}) {
-      let module = U.Buf({T: U._NOISE_LEN, g, s, r, d, n: 0}),
-          data = module.mem(),
-          i;
-      for (i = 0; i < module.N; i++) {
-        data[i] = $R();
+      mem(chan = 0) {
+        return this.b.getChannelData(chan)
       }
-      module.lock();
-      return module;
-    },
 
-    // Pulse produces a pulse waveform of width w at offset o.
-    // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
-    //         Also: W: samples
-    Pulse ({ w=0.1, o=0, S=1, f, g=1, s=0, W=1024 } = {}) {
-      // TODO: We could be cool and make a frequency domain waveform instead.
-      let module = U.Buf({T: W / U.SR, S, f, g, s, n: 1}),
-          data = module.mem(),
-          bias = 0.5 - w,
-          i;
-      for (i in data) {
-        data[i] = bias + ((((i - module.N * o) % module.N) / module.N <= w) ? 0.5 : -0.5);
+      lock(loop = true) {
+        this.B.buffer = this.b
+        this.B.loop = loop
       }
-      module.lock();
-      return module;
-    },
+    }      
+    return module
+  }
 
-    // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-    // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
-    // TODO: Input param: y?
-    Dist ({ a=50, F=() => U.dw(a), g=1, r$ }) {
-      let module = {
-        ...U._ModuleBaseAmp(g),
-        w: ac.createWaveShaper()
-      };
-      module.w.curve = F();
-      module.w.oversample = '4x';
-      module._addParam(U._ParamAudio(module.w, module, r$));
-      module.w.connect(module.z);
-      return module;
-    },
+  /**
+   * Noise produces a playable buffer of noise.
+   * @param {number | MinuteSynth.SynthModule} g - gain (default: 1)
+   * @param {number} s - start time (default: 0)
+   * @param {number | MinuteSynth.SynthModule} r - playback rate (default: 1)
+   * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
+   * @returns {MinuteSynth.SynthModule} An instance of a noise module
+   */
+  Noise({ g = 1, s = 0, r, d } = {}) {
+    const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0 })
+    const data = module.mem()
+    for (let i = 0; i < module.N; i++) {
+      data[i] = Math.random() * 2 - 1
+    }
+    module.lock()
+    return module
+  }
+
+  // Pulse produces a pulse waveform of width w at offset o.
+  // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
+  //         Also: W: samples
+  Pulse ({ w=0.1, o=0, S=1, f, g=1, s=0, W=1024 } = {}) {
+    // TODO: We could be cool and make a frequency domain waveform instead.
+    let module = U.Buf({T: W / U.SR, S, f, g, s, n: 1}),
+        data = module.mem(),
+        bias = 0.5 - w,
+        i;
+    for (i in data) {
+      data[i] = bias + ((((i - module.N * o) % module.N) / module.N <= w) ? 0.5 : -0.5);
+    }
+    module.lock();
+    return module;
+  }
+
+  // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
+  // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
+  // TODO: Input param: y?
+  Dist ({ a=50, F=() => U.dw(a), g=1, r$ }) {
+    let module = {
+      ...U._ModuleBaseAmp(g),
+      w: ac.createWaveShaper()
+    };
+    module.w.curve = F();
+    module.w.oversample = '4x';
+    module._addParam(U._ParamAudio(module.w, module, r$));
+    module.w.connect(module.z);
+    return module;
+  }
 
     // Filt (Filter) allows for filtering of sound using the filter type provided in t.
     // Params: t: type, q: Q value, f: frequency, S: scale, b: boost, g: gain, r$: input
