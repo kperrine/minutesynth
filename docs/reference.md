@@ -102,11 +102,11 @@ Constant provides a patchable value that can remain steady, or be altered throug
 
 ### Comp (Compressor) 
 
-`Comp({ t, k, o, d, a, r, g=1, r$ })`
+`Comp({ t, k, o, a, r, g=1, r$ })`
 
 A classic compressor that can gracefully regulate the levels of a sound and prevent cliping (e.g. loud sounds that exceed the -1 to 1 sample amplitude limits). See [WebAudio docs](https://developer.mozilla.org/en-US/docs/Web/API/DynamicsCompressorNode) for more information.
 
-Params: `t:` threshold, `k:` knee, `o:` ratio, `d:` reduction (non-patchable), `a:` attack, `r:` release
+Params: `t:` threshold, `k:` knee, `o:` ratio, `a:` attack, `r:` release
 
 ---
 

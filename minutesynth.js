@@ -425,7 +425,7 @@ class MinuteSynth {
     }
   }
 
-  // Convenience/clarity constants for t: type:
+  // Convenience/clarity constants for Osc t: type:
   static WaveType = Object.freeze({
     SINE: 1,
     SQUARE: 2,
@@ -438,7 +438,7 @@ class MinuteSynth {
    * Osc (Oscillaor) is a simple tone generator. Specify its type and also
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
-   * @param {WaveType | number | string} t - Type of waveform
+   * @param {number | string} t - Type of waveform, can use WaveType lookup
    * @param {number} S - scale (default: 1)
    * @param {number | MinuteSynth.SynthModule | []} f - default frequency
    * @param {number | MinuteSynth.SynthModule | []} d - detune (default: 0)
@@ -538,96 +538,144 @@ class MinuteSynth {
     return module
   }
 
-  // Pulse produces a pulse waveform of width w at offset o.
-  // Params: w: pulse width (0-1); o: pulse offset (0-1); S: scale; f: default frequency; g: gain; s: start time
-  //         Also: W: samples
-  Pulse ({ w=0.1, o=0, S=1, f, g=1, s=0, W=1024 } = {}) {
+  /**
+   * Pulse produces a pulse waveform of width w at offset o.
+   * @param {number} w - pulse width (0-1)
+   * @param {number} o - pulse offset (0-1)
+   * @param {number} S - scale
+   * @param {number} f - default frequency
+   * @param {number | MinuteSynth.SynthModule | []} g - gain
+   * @param {number} s - start time
+   * @param {number} W - samples
+   * @returns {MinuteSynth.SynthModule} An instance of a pulse module
+   */
+  Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
-    let module = U.Buf({T: W / U.SR, S, f, g, s, n: 1}),
-        data = module.mem(),
-        bias = 0.5 - w,
-        i;
-    for (i in data) {
-      data[i] = bias + ((((i - module.N * o) % module.N) / module.N <= w) ? 0.5 : -0.5);
+    const module = this.Buf({ T: W / this.audioContext.sampleRate, S, f, g, s, n: 1 })
+    const data = module.mem()
+    const bias = 0.5 - w
+    for (let i in data) {
+      data[i] = bias + ((((i - module.N * o) % module.N) / module.N <= w) ? 0.5 : -0.5)
     }
-    module.lock();
-    return module;
+    module.lock()
+    return module
   }
 
-  // Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-  // Params: F: distort function (default: M$.dw()), a: function parameter, r$: input
-  // TODO: Input param: y?
-  Dist ({ a=50, F=() => U.dw(a), g=1, r$ }) {
-    let module = {
-      ...U._ModuleBaseAmp(g),
-      w: ac.createWaveShaper()
-    };
-    module.w.curve = F();
-    module.w.oversample = '4x';
-    module._addParam(U._ParamAudio(module.w, module, r$));
-    module.w.connect(module.z);
-    return module;
+  /**
+   * Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
+   * @param {function(any): number[]} F - distort function (default: this.dw())
+   * @param {number} a - default function parameter (default: 50)
+   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} r$ - reverse-attach input
+   * @return {MinuteSynth.SynthModule} An instance of a distortion module
+   */
+  Dist({ a = 50, F = () => this.dw(a), g = 1, r$ }) {
+    // TODO: Input param: y?
+    const module = class Dist extends this._BaseAmp {
+      w = this.minuteSynth.audioContext.createWaveShaper()
+      constructor() {
+        super(g)
+        this.w.curve = F()
+        this.w.oversample = '4x'
+        this._addParam(new this._ParamAudio(this.w, this, r$));
+        this.w.connect(this.z)
+      }
+    }
+    return new module()
   }
 
-    // Filt (Filter) allows for filtering of sound using the filter type provided in t.
-    // Params: t: type, q: Q value, f: frequency, S: scale, b: boost, g: gain, r$: input
-    Filt ({ t, q, f, S=1, b, g=1, r$ }) {
-      let module = {
-        ...U._ModuleBaseAmp(g),
-        q: ac.createBiquadFilter(),
-        _calcSCRate: freq => freq * S
-      };
-      module.q.type = isNaN(t) ? t : ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1];
-      module._addParam(U._ParamAudio(module.q, module, r$));
-      module._addParam(U._ParamValue('Q', module.q.Q, module, q));
-      module._addParam(U._ParamValue('b', module.q.gain, module, b));
-      module._addFreqHelper(module.q.frequency, f);
-      module.q.connect(module.z);
-      return module;
-    },
-    // Convenience/clarity constants for t: type:
-    lowpass: 1,
-    highpass: 2,
-    bandpass: 3,
-    lowshelf: 4,
-    highshelf: 5,
-    peaking: 6,
-    notch: 7,
-    allpass: 8,
+  // Convenience/clarity constants for Filt t: type:
+  static FilterType = Object.freeze({
+    LOWPASS: 1,
+    HIGHPASS: 2,
+    BANDPASS: 3,
+    LOWSHELF: 4,
+    HIGHSHELF: 5,
+    PEAKING: 6,
+    NOTCH: 7,
+    ALLPASS: 8
+  })
 
-    // Conv (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
-    // Use b: M$.reverb() for a simple reverb effect.
-    // Params: b: BufferNode, g: gain, n: normalize (true by defualt), r$: input
-    Conv ({ b, g=1, n=true, r$ }) {
-      let module = {
-        ...U._ModuleBaseAmp(g),
-        c: ac.createConvolver(),
-        b
-      };
-      module.c.normalize = n;
-      module.c.buffer = module.b;
-      module._addParam(U._ParamAudio(module.c, module, r$));
-      module.c.connect(module.z);
-      return module;
-    },
+  /**
+   * Filt (Filter) allows for filtering of sound using the filter type provided in t.
+   * @param {number | string} t - Type of filter, can use FilterType lookup
+   * @param {number | MinuteSynth.SynthModule | []} q - Q value
+   * @param {number | MinuteSynth.SynthModule | []} f - frequency
+   * @param {number} S - scale
+   * @param {number | MinuteSynth.SynthModule | []} b - boost
+   * @param {number | MinuteSynth.SynthModule | []} g - gain
+   * @param {MinuteSynth.SynthModule | []} r$ - reverse-attach input
+   * @returns {MinuteSynth.SynthModule} An instance of a filter module
+   */
+  Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
+    const module = class Filt extends this._BaseAmp {
+      q = this.minuteSynth.audioContext.createBiquadFilter()
+      _calcSCRate = freq => freq * S
+      constructor() {
+        super(g)
+        this.q.type = isNaN(t) ? t : ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
+        this._addParam(new this._ParamAudio(this.q, this, r$))
+        this._addParam(new this._ParamValue('Q', this.q.Q, this, q))
+        this._addParam(new this._ParamValue('b', this.q.gain, this, b))
+        this._addFreqHelper(this.q.frequency, f)
+        this.q.connect(this.z)
+      }
+    }
+    return new module()
+  }
 
-    // Comp (Compressor) 
-    // Params: t: threshold, k: knee, o: ratio, d: reduction, a: attack, r: release
-    Comp ({ t, k, o, d, a, r, g=1, r$ }={}) {
-      let module = {
-        ...U._ModuleBaseAmp(g),
-        R: ac.createDynamicsCompressor()
-      };
-      module._addParam(U._ParamAudio(module.R, module, r$));
-      module._addParam(U._ParamValue('t', module.R.threshold, module, t));
-      module._addParam(U._ParamValue('k', module.R.knee, module, k));
-      module._addParam(U._ParamValue('o', module.R.ratio, module, o));
-      module._addParam(U._ParamValue('d', module.R.reduction, module, d));
-      module._addParam(U._ParamValue('a', module.R.attack, module, a));
-      module._addParam(U._ParamValue('r', module.R.release, module, r));
-      module.R.connect(module.z);
-      return module;
-    },
+  /**
+   * Conv (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
+   * Use b: MinuteSynth.reverb() for a simple reverb effect.
+   * @param {AudioBuffer} b - AudioBuffer containing the impulse response
+   * @param {number | MinuteSynth.SynthModule | []} g - Gain (default: 1)
+   * @param {boolean} n - Normalize (default: true)
+   * @param {number | MinuteSynth.SynthModule | []} r$ - Reverse-attach input
+   * @returns {MinuteSynth.SynthModule} An instance of a convolver module
+   */
+  Conv({ b, g = 1, n = true, r$ }) {
+    const Module = class Conv extends this._BaseAmp {
+      c = this.minuteSynth.audioContext.createConvolver()
+      b = b
+
+      constructor() {
+        super(g)
+        this.c.normalize = n
+        this.c.buffer = this.b
+        this._addParam(new this._ParamAudio(this.c, this, r$))
+        this.c.connect(this.z)
+      }
+    }
+    return new Module()
+  }
+
+  /** 
+   * Comp (Compressor) 
+   * @param {number | MinuteSynth.SynthModule | []} t - threshold
+   * @param {number | MinuteSynth.SynthModule | []} k - knee
+   * @param {number | MinuteSynth.SynthModule | []} o - ratio
+   * @param {number | MinuteSynth.SynthModule | []} a - attack
+   * @param {number | MinuteSynth.SynthModule | []} r - release
+   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | []} r$ - reverse-attach input
+   * @return {MinuteSynth.SynthModule} An instance of a compressor module
+   */
+  Comp ({ t, k, o, a, r, g=1, r$ }={}) {
+    const module = class Comp extends this._BaseAmp {
+      R = this.minuteSynth.audioContext.createDynamicsCompressor()
+      constructor() {
+        super(g)
+        this._addParam(new this._ParamAudio(this.R, this, r$))
+        this._addParam(new this._ParamValue('t', this.R.threshold, this, t))
+        this._addParam(new this._ParamValue('k', this.R.knee, this, k))
+        this._addParam(new this._ParamValue('o', this.R.ratio, this, o))
+        this._addParam(new this._ParamValue('a', this.R.attack, this, a))
+        this._addParam(new this._ParamValue('r', this.R.release, this, r))
+        this.R.connect(this.z)
+      }
+    }
+    return new module()
+  }
 
   /**
    * C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
@@ -676,7 +724,7 @@ class MinuteSynth {
       a = { ...this._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
       _offState = true
       _newState = true
-      
+
       constructor() {
         super()
 
@@ -684,9 +732,14 @@ class MinuteSynth {
         this._addParam(new this._ParamAudio(this, this, t$))
       }
 
-      // on is called manually or by the Voice to engage the ADSR action (attack, decay,
-      // sustain).
-      on (onTime, freq) {
+      /**
+       * on is called manually or by the Voice to engage the ADSR action (attack, decay,
+       * sustain).
+       * @param {number} onTime - The time at which to start the ADSR action.
+       * @param {number} freq - Ununsed
+       */
+      on(onTime, freq) {
+        // TODO: Allow onTime to be 0 for immediate action
         if (this._newState) {
           this.v.vT(this.a.b, onTime)
           this._newState = false
@@ -702,8 +755,12 @@ class MinuteSynth {
         }
       }
 
-      // triggerOff will cause the ADSR action to conclude (release).
-      off (offTime) {
+      /** 
+       * triggerOff will cause the ADSR action to conclude (release).
+       * @param {number} offTime - The time at which to start the release action.
+       */
+      off(offTime) {
+        // TODO: Allow offTime to be 0 for immediate action
         if (this._offState) {
           this.v.vT(this.a.b, offTime)
         }
@@ -718,18 +775,23 @@ class MinuteSynth {
     return new Module()
   }
 
-    // Prog (Program) orchestrates a series of values on a constant output that can be triggered.
-    // Params: t: timesteps (seconds from trigger) array, v: values array, p: portamento (glide) time
-    Prog ({ t, v, p=0 }) {
-      const module = U.Freq({p});
-      const origOnFn = module.on;
-      const origOffFn = module.off;
-      module.on = (onTime, freq) => {
-        t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
-          : origOffFn.call(module, onTime + time));
-      }
-      return module;
-    },
+  /**
+   * Prog (Program) orchestrates a series of values on a constant output that can be triggered.
+   * @param {number[]} t - Timesteps (seconds from trigger) array
+   * @param {number[]} v - Values array
+   * @param {number} p - Portamento (glide) time (default: 0)
+   * @returns {MinuteSynth.SynthModule} An instance of a program module
+   */
+  Prog ({ t, v, p=0 }) {
+    const module = this.Freq({p})
+    const origOnFn = module.on
+    const origOffFn = module.off
+    module.on = (onTime, freq) => {
+      t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
+        : origOffFn.call(module, onTime + time))
+    }
+    return module
+  }
 
     // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
     // Gains are defaulted to 1 unless an array of gains are specified.
