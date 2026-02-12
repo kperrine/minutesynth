@@ -6,44 +6,19 @@
 var ACX = window.AudioContext || window.webkitAudioContext
 
 class MinuteSynth {
-  /**
-   * Returns a random number, by default in [-1, 1]:
-   * @param {number} m - Range of random number (default: 2)
-   * @param {number} a - Offset of random number (default: -1)
-   * @returns {number} A random number within the specified range and offset.
-   */
-/*
-  static #random (m = 2, a = -1) {
-    return Math.random() * m + a
-  }
-*/
-
-  /**
-   * Calls the given function f on the input a or each element of the input
-   * if a is an array:
-   * @param {any|any[]} a - The input value or array of values.
-   * @param {function} f - The function to apply to each element.
-   * @returns {any[]} The result of applying the function to each element.
-   */
-/*
-  static #apply (a, f) {
-    return [].concat(a).forEach(element => f(element))
-  }
-*/
-
   // Represents Attack, Decay, Sustain, Release parameterized curve.
   // The default ADSR parameters lets the tone stay on until it is shut off.
   static ADSRParams = class {
     /**
      * Creates an ADSR (Attack, Decay, Sustain, Release) parameterization
-     * @param {number} D - start delay for attack
-     * @param {number} b - base value (= "off" value)
-     * @param {number} e - attack arrival value
-     * @param {number} a - attack time (time to go from b to e)
-     * @param {number} d - decay time (time to go from e to s)
-     * @param {number} s - sustain value (after the attack-decay sequence
-     * @param {number} r - release time (from s to b, occurring when triggerOff() is called)
-     * @param {number} p - auto-pulse-- if nonzero, automatically does a triggerOff p seconds after triggerOn.
+     * @param {number | undefined} D - start delay for attack
+     * @param {number | undefined} b - base value (= "off" value)
+     * @param {number | undefined} e - attack arrival value
+     * @param {number | undefined} a - attack time (time to go from b to e)
+     * @param {number | undefined} d - decay time (time to go from e to s)
+     * @param {number | undefined} s - sustain value (after the attack-decay sequence
+     * @param {number | undefined} r - release time (from s to b, occurring when triggerOff() is called)
+     * @param {number | undefined} p - auto-pulse-- if nonzero, automatically does a triggerOff p seconds after triggerOn.
      */     
     constructor({ D = 0, b = 0, e = 1, a = 1e-3, d = 0, s = 1, r = 0, p = 0 } = {}) {
       Object.assign(this, { D, b, e, a, d, s, r, p })
@@ -83,7 +58,7 @@ class MinuteSynth {
 
   /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
-   * @param {AudioContext} ac - The AudioContext to use (default: new AudioContext()).
+   * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
    */
   constructor(ac = new ACX()) {
     this.audioContext = ac
@@ -158,7 +133,7 @@ class MinuteSynth {
      * Attaches this module to a parameter (or main input) of a downstream module. tgtThing can either be
      * a Module or a Param.
      * @param {MinuteSynth.SynthModule | MinuteSynth._Param} tgtThing 
-     * @param {string} tgtParamName - Optional parameter name to attach to if tgtThing is a module. Defaults to "in".
+     * @param {string | undefined} tgtParamName - Optional parameter name to attach to if tgtThing is a module. Defaults to "in".
      * @returns {MinuteSynth.SynthModule} The target module, to allow for chaining.
      */
     $(tgtThing, tgtParamName) {
@@ -177,8 +152,8 @@ class MinuteSynth {
 
     /**
      * A "reverse attach", which will allow one or more source modules to attach to this module
-     * @param {number | MinuteSynth.SynthModule | []} srcModules - The source module(s) to attach.
-     * @param {string} thisParamName - Parameter name to attach to if this module has multiple parameters. Defaults to "in".
+     * @param {number | MinuteSynth.SynthModule | [] | undefined} srcModules - The source module(s) to attach.
+     * @param {string | undefined} thisParamName - Parameter name to attach to if this module has multiple parameters. Defaults to "in".
      */
     r$(srcModules, thisParamName) {
       [].concat(srcModules).forEach(module => {
@@ -222,7 +197,7 @@ class MinuteSynth {
      * Removes all connections to and from this module.
      */
     kill() {
-      this.detach();
+      this.detach()
     }
 
     /**
@@ -247,10 +222,10 @@ class MinuteSynth {
     /**
      * Boilerplate for a frequency-based parameter setup
      * @param {AudioNode} control 
-     * @param {number} defFreq 
+     * @param {number | undefined} defFreq 
      */
     _addFreqHelper(control, defFreq = 0) {
-      control.value = 0;
+      control.value = 0
       this._S = U.Gain()
       if (!isNaN(defFreq)) {
         // If the default value is a number, then create a constant for it:
@@ -296,7 +271,7 @@ class MinuteSynth {
     /**
      * "Reverse attach:" Attach a source module to this parameter. If it is a Voice,
      * then register the voice.
-     * @param {number | MinuteSynth.SynthModule | []} srcModules
+     * @param {number | MinuteSynth.SynthModule | [] | undefined} srcModules
      * @return {MinuteSynth._Param} The current parameter object, to allow for chaining.
      */  
     r$(srcModules) {
@@ -314,7 +289,7 @@ class MinuteSynth {
 
     /**
      * Remove an incoming connection by incoming module reference, or all if no parameter specified
-     * @param {MinuteSynth.SynthModule | null | undefined} inModule 
+     * @param {MinuteSynth.SynthModule | undefined} inModule 
      */
     detach(inModule) {
       for (let module of [...this._inModules]) { // Iterate over copy
@@ -379,7 +354,7 @@ class MinuteSynth {
      * Cretes a parameter that represents an audio input
      * @param {AudioParam} obj
      * @param {number | string} defVal 
-     * @param {string} paramName 
+     * @param {string | undefined} paramName 
      */
     constructor(obj, defVal, paramName = 'in') {
       super(paramName, obj, defVal)
@@ -396,8 +371,8 @@ class MinuteSynth {
     /**
      * Cretes a parameter that allows for start/stop control
      * @param {AudioParam} obj
-     * @param {number} startTime 
-     * @param {number} defVal 
+     * @param {number} startTime - -1 to defer, 0 to autostart now, and other to start at specified time.
+     * @param {number | undefined} defVal 
      */
     constructor(obj, startTime, defVal = 0) {
       super('s', obj, defVal)
@@ -407,17 +382,29 @@ class MinuteSynth {
       }
     }
 
+    /**
+     * Start at the specified time, or immediately if startTime is 0 or not provided
+     * @param {number | undefined} startTime 
+     */
     go(startTime = 0) {
-      this._obj.start((startTime == 0) ? this.synthModule.minuteSynth.audioContext.now() : startTime)
+      this._obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
     }
 
+    /**
+     * Stop at the specified time, or immediately if stopTime is 0 or not provided
+     * @param {number | undefined} stopTime 
+     */
     no(stopTime = 0) {
-      this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.audioContext.now() : stopTime)
+      this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
       // TODO: Consider scheduling an object kill() at stopTime
     }
   }
 
   static BaseAmp = class extends MinuteSynth.SynthModule {
+    /**
+     * Establishes a base module with a gain node for controlling output level (default unity gain)
+     * @param {number | undefined} gainVal - Default gain, including negative values to flip the waveform
+     */
     constructor(gainVal = 1) {
       super()
       this.z = this.minuteSynthaudioContext.createGain()
@@ -425,7 +412,9 @@ class MinuteSynth {
     }
   }
 
-  // Convenience/clarity constants for Osc t: type:
+  /**
+   * Convenience/clarity constants for Osc t: type
+   */
   static WaveType = Object.freeze({
     SINE: 1,
     SQUARE: 2,
@@ -439,14 +428,14 @@ class MinuteSynth {
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
    * @param {number | string} t - Type of waveform, can use WaveType lookup
-   * @param {number} S - scale (default: 1)
+   * @param {number | undefined} S - scale (default: 1)
    * @param {number | MinuteSynth.SynthModule | []} f - default frequency
-   * @param {number | MinuteSynth.SynthModule | []} d - detune (default: 0)
-   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
-   * @param {number} s - start time;
-   * @param {Float32Array} r - real values;
-   * @param {Float32Array} i - imag. values,
-   * @param {number} n - nominal playback frequncy (for custom waveform)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} d - detune (default: 0)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | undefined} s - start time (default: 0)
+   * @param {Float32Array | undefined} r - real values
+   * @param {Float32Array | undefined} i - imag. values
+   * @param {number | undefined} n - nominal playback frequncy (for custom waveform)
    * @returns {MinuteSynth.SynthModule} An instance of an oscillator module
    */
   Osc({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
@@ -474,18 +463,18 @@ class MinuteSynth {
   /**
    * Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
    * the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
-   * @param {number} T - duration of the buffer in seconds (default: 1)
-   * @param {number} c - number of channels (default: 1)
-   * @param {number} S - scale (default: 1)
-   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
-   * @param {number} s - start time (default: 0)
-   * @param {number} F - sampling rate (default: AudioContext's sample rate)
-   * @param {number | MinuteSynth.SynthModule | []} r - playback rate (default: 1)
-   * @param {number | MinuteSynth.SynthModule} d - detune (default: 0)
-   * @param {number} n - nominal playback frequency (0 for no freq. control)
+   * @param {number | undefined} T - duration of the buffer in seconds (default: 1)
+   * @param {number | undefined} c - number of channels (default: 1)
+   * @param {number | undefined} S - scale (default: 1)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | undefined} s - start time (default: 0)
+   * @param {number | undefined} F - sampling rate (default: AudioContext's sample rate)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r - playback rate (default: 1)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} d - detune (default: 0)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
    * @returns {MinuteSynth.SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0, f }) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0 }) {
     const Module = class Buf extends this._BaseAmp {
       b = this.audioContext.createBuffer(c, ~~(F * T), F)
       B = this.audioContext.createBufferSource()
@@ -499,7 +488,7 @@ class MinuteSynth {
         this._addParam(new this._ParamStart(this.B, this, s))
         this._addParam(new this._ParamValue('d', this.B.detune, d))
         if (n) {
-          this._addFreqHelper(this.B.playbackRate, f)
+          this._addFreqHelper(this.B.playbackRate, n)
         }
         else {
           this._addParam(new this._ParamValue('r', this.B.playbackRate, r))
@@ -508,10 +497,19 @@ class MinuteSynth {
         // TODO: n isn't used except for determing if we are frequency controlled.
       }
 
+      /**
+       * Exposes the buffer for specified channel
+       * @param {number | undefined} chan - Channel number (default: 0)
+       * @returns {Float32Array} The channel data
+       */
       mem(chan = 0) {
         return this.b.getChannelData(chan)
       }
 
+      /**
+       * Commits all channels of the exposed buffer, with optional ability to specify looping.
+       * @param {boolean} loop - Whether to loop the buffer when played (default: true) 
+       */
       lock(loop = true) {
         this.B.buffer = this.b
         this.B.loop = loop
@@ -522,10 +520,10 @@ class MinuteSynth {
 
   /**
    * Noise produces a playable buffer of noise.
-   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
-   * @param {number} s - start time (default: 0)
-   * @param {number | MinuteSynth.SynthModule | []} r - playback rate (default: 1)
-   * @param {number | MinuteSynth.SynthModule | []} d - detune (default: 0)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | undefined} s - start time (default: 0)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r - playback rate (default: 1)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} d - detune (default: 0)
    * @returns {MinuteSynth.SynthModule} An instance of a noise module
    */
   Noise({ g = 1, s = 0, r, d } = {}) {
@@ -540,13 +538,13 @@ class MinuteSynth {
 
   /**
    * Pulse produces a pulse waveform of width w at offset o.
-   * @param {number} w - pulse width (0-1)
-   * @param {number} o - pulse offset (0-1)
-   * @param {number} S - scale
-   * @param {number} f - default frequency
-   * @param {number | MinuteSynth.SynthModule | []} g - gain
-   * @param {number} s - start time
-   * @param {number} W - samples
+   * @param {number | undefined} w - pulse width (0-1); default: 0.1
+   * @param {number | undefined} o - pulse offset (0-1); default: 0
+   * @param {number | undefined} S - scale; default: 1
+   * @param {number | undefined} f - default frequency; default: 440
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain; default: 1
+   * @param {number | undefined} s - start time; default: 0
+   * @param {number | undefined} W - samples; default: 1024
    * @returns {MinuteSynth.SynthModule} An instance of a pulse module
    */
   Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
@@ -563,10 +561,10 @@ class MinuteSynth {
 
   /**
    * Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-   * @param {function(any): number[]} F - distort function (default: this.dw())
-   * @param {number} a - default function parameter (default: 50)
-   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
-   * @param {number | MinuteSynth.SynthModule | []} r$ - reverse-attach input
+   * @param {function(any): number[] | undefined} F - distort function (default: this.dw())
+   * @param {number | undefined} a - default function parameter (default: 50)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input
    * @return {MinuteSynth.SynthModule} An instance of a distortion module
    */
   Dist({ a = 50, F = () => this.dw(a), g = 1, r$ }) {
@@ -584,7 +582,9 @@ class MinuteSynth {
     return new module()
   }
 
-  // Convenience/clarity constants for Filt t: type:
+  /**
+   * Convenience/clarity constants for Filt t: type
+   */
   static FilterType = Object.freeze({
     LOWPASS: 1,
     HIGHPASS: 2,
@@ -601,10 +601,10 @@ class MinuteSynth {
    * @param {number | string} t - Type of filter, can use FilterType lookup
    * @param {number | MinuteSynth.SynthModule | []} q - Q value
    * @param {number | MinuteSynth.SynthModule | []} f - frequency
-   * @param {number} S - scale
-   * @param {number | MinuteSynth.SynthModule | []} b - boost
-   * @param {number | MinuteSynth.SynthModule | []} g - gain
-   * @param {MinuteSynth.SynthModule | []} r$ - reverse-attach input
+   * @param {number | undefined} S - scale (default: 1)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} b - boost
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input
    * @returns {MinuteSynth.SynthModule} An instance of a filter module
    */
   Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
@@ -628,9 +628,9 @@ class MinuteSynth {
    * Conv (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
    * Use b: MinuteSynth.reverb() for a simple reverb effect.
    * @param {AudioBuffer} b - AudioBuffer containing the impulse response
-   * @param {number | MinuteSynth.SynthModule | []} g - Gain (default: 1)
-   * @param {boolean} n - Normalize (default: true)
-   * @param {number | MinuteSynth.SynthModule | []} r$ - Reverse-attach input
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - Gain (default: 1)
+   * @param {boolean | undefined} n - Normalize (default: true)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - Reverse-attach input
    * @returns {MinuteSynth.SynthModule} An instance of a convolver module
    */
   Conv({ b, g = 1, n = true, r$ }) {
@@ -656,8 +656,8 @@ class MinuteSynth {
    * @param {number | MinuteSynth.SynthModule | []} o - ratio
    * @param {number | MinuteSynth.SynthModule | []} a - attack
    * @param {number | MinuteSynth.SynthModule | []} r - release
-   * @param {number | MinuteSynth.SynthModule | []} g - gain (default: 1)
-   * @param {number | MinuteSynth.SynthModule | []} r$ - reverse-attach input
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input
    * @return {MinuteSynth.SynthModule} An instance of a compressor module
    */
   Comp ({ t, k, o, a, r, g=1, r$ }={}) {
@@ -679,7 +679,7 @@ class MinuteSynth {
 
   /**
    * C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
-   * @param {number | MinuteSynth.SynthModule | []} v - The initial value of the constant (default: 0).
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} v - The initial value of the constant (default: 0).
    * @return {MinuteSynth.SynthModule} An instance of a constant source module.
    */
   C(v = 0) {
@@ -697,8 +697,8 @@ class MinuteSynth {
 
   /**
    * Gain (Amplifier) is a very simple module that acts as a multiplier.
-   * @param {number | MinuteSynth.SynthModule | []} g - The gain value (default: 1).
-   * @param {number | MinuteSynth.SynthModule | []} r$ - Optional input to be connected to the gain parameter.
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - The gain value (default: 1).
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - Optional input to be connected to the gain parameter.
    * @return {MinuteSynth.SynthModule} An instance of a gain module.
    */
   Gain({ g = 1, r$ } = {}) {
@@ -715,11 +715,11 @@ class MinuteSynth {
    * ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
    * can allow values to ramp up and down whenever the module is triggered. Use the t$ 
    * (second parameter) to reverse-bind a trigger.
-   * @param {MinuteSynth.ADSRParams | object} adsr - The ADSR parameters to use for this module (default: U._DEFAULT_ADSR).
+   * @param {MinuteSynth.ADSRParams | object | undefined} adsr - The ADSR parameters to use for this module (default: this._DEFAULT_ADSR).
    * @param {MinuteSynth.SynthModule | undefined} t$ - Optional trigger input for this module.
    * @returns {MinuteSynth.SynthModule} An instance of an ADSR module.
    */
-  ADSR (adsr = {}, t$) {
+  ADSR(adsr = {}, t$) {
     const Module = class ADSR extends this._SynthModule {
       a = { ...this._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
       _offState = true
@@ -779,10 +779,10 @@ class MinuteSynth {
    * Prog (Program) orchestrates a series of values on a constant output that can be triggered.
    * @param {number[]} t - Timesteps (seconds from trigger) array
    * @param {number[]} v - Values array
-   * @param {number} p - Portamento (glide) time (default: 0)
+   * @param {number | undefined} p - Portamento (glide) time (default: 0)
    * @returns {MinuteSynth.SynthModule} An instance of a program module
    */
-  Prog ({ t, v, p=0 }) {
+  Prog({ t, v, p = 0 }) {
     const module = this.Freq({p})
     const origOnFn = module.on
     const origOffFn = module.off
@@ -793,226 +793,185 @@ class MinuteSynth {
     return module
   }
 
-    // Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
-    // Gains are defaulted to 1 unless an array of gains are specified.
-    // Params: F: Array of frequencies, G: Array of gains (default: 1's), n = nominal frequency, R = sample size
-    Spec ({ F, G, n=440, R=U.SR/4, f, s=0, g=1, S=1 }) {
-      let real = new Array(R).fill(0),
-          imag = [...real],
-          i, j;
-      for (i in F) {
-        j = ~~(F[i] * R / U.SR);
-        if (j < R) {
-          real[j] = G ? G[i] : 1;
-        }
+  /** 
+   * Spec (Spectrum) creates a complex oscillator waveform from a series of real frequencies.
+   * Gains are defaulted to 1 unless an array of gains are specified.
+   * @param {number[]} F - Array of frequencies
+   * @param {number[] | undefined} G - Array of gains (default: 1's)
+   * @param {number | undefined} n - Nominal frequency
+   * @param {number | undefined} R - Resolution (default: sample rate / 4)
+   * @param {number | MinuteSynth.SynthModule | []} f - default frequency
+   * @param {number | undefined} s - start time (default: 0)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | undefined} S - scale (default: sample rate / R)
+   * @returns {MinuteSynth.SynthModule} An instance of a spectrum module
+   */
+  Spec({ F, G, n = 440, R = this.audioContext.sampleRate / 4, f, s = 0, g = 1, S = 1 }) {
+    const real = new Array(R).fill(0)
+    const imag = [...real]
+    for (let i in F) {
+      let j = ~~(F[i] * R / this.audioContext.sampleRate)
+      if (j < R) {
+        real[j] = G ? G[i] : 1
       }
-      let module = U.Osc({ r: real, i: imag, f, s, g, S: U.SR/R * S, n });
-      return module;
-    },
+    }
+    const module = U.Osc({ r: real, i: imag, f, s, g, S: this.audioContext.sampleRate / R * S, n })
+    return module
+  }
 
-    // Freq (FreqModule) is like a voltage control to attach to oscillators and other frequency inputs.
-    // It centrally manages a frequency and optionally has a glide (portamento) capability.
-    // Use the t$ (second parameter) to reverse-bind a trigger.
-    Freq ({ p=0, t$ } = {}) {
-      let module = {
-        ...U.C(),
-        p,
-        _prevFreq: 0,
+  /**
+   * Freq (Frequency Module) is like a voltage control to attach to oscillators and other frequency inputs.
+   * It centrally manages a frequency and optionally has a glide (portamento) capability.
+   * Use the t$ (second parameter) to reverse-bind a trigger.
+   * @param {number | undefined} p - Portamento (glide) time (default: 0)
+   * @param {MinuteSynth.SynthModule | undefined} t$ - Optional trigger input for this module.
+   * @returns {MinuteSynth.SynthModule} An instance of a frequency control module
+   */
+  Freq({ p = 0, t$ } = {}) {
+    const module
+    let module = {
+      ...U.C(),
+      p,
+      _prevFreq: 0,
 
-        // on is called manually or by the Voice to set the next frequency.
-        on (onTime, freq) {
-          // TODO: Can we use setTarget with 0 time constant?
-          const Z = this;
-          if (Z._prevFreq && Z.p) {
-            Z.v.t(freq, onTime, Z.p / 3);
-          }
-          else {
-            Z.v.vT(freq, onTime);
-          }
-          Z._prevFreq = freq;
+      // on is called manually or by the Voice to set the next frequency.
+      on (onTime, freq) {
+        // TODO: Can we use setTarget with 0 time constant?
+        const Z = this;
+        if (Z._prevFreq && Z.p) {
+          Z.v.t(freq, onTime, Z.p / 3);
         }
-      };
-
-      // Allow for triggering via a similar mechanism as used for connecting audio:
-      module._addParam(U._ParamAudio(module, module, t$));
-      return module;
-    },
-
-    // Voice represents a single channel of sound that is controlled by one main frequency.
-    // The gain g is the final "volume control" and its output is the AudioContext's destination.
-    // Set v to zero to disable attaching to ac.destination. You can get final WebAudio from .z.
-    // An automatically generated frequency controller is available at .f.
-    Voice ({ g=0.5, v=1, p, r$ } = {}) {
-      // TODO: Allow inputs to be registrants
-      let ret = {
-        ...U.Gain({g, r$}),
-        _modules: [],
-
-        // f is the Voice's main frequency control. Set it by calling on().
-        f: U.Freq({p}),
-
-        // _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
-        // connection. Return a nonzero to automatically remove values from input.
-        _$ (targetObj) {
-          this.rg(targetObj);
-          return 0;
-        },
-
-        // rg() allows a module to be registered with this voice to receive trigger events.
-        // The preferred way is to attach Voice to registered modules with .$()
-        // TODO: Singular "passthrough" register that returns the same object. Or return if single item.
-        rg (...modules) {
-          this._modules.push.apply(this._modules, modules);
-          return modules[0];
-        },
-
-        /*
-        // Removes Modules from the Voice's triggering control.
-        deregister(...modules) {
-          modules.forEach(module => this.modules.splice(this.modules.indexOf(module), 1));
-        },
-        */
-
-        // This will call on() for all Modules registered.
-        on (onTime, freq) {
-          !onTime && (onTime = U.now())
-          this._modules.forEach(module => module.on && module.on(onTime, freq));
-        },
-
-        // This will call off() for all Modules registered.
-        off (offTime) {
-          !offTime && (offTime = U.now())
-          this._modules.forEach(module => module.off && module.off(offTime));
-        },
-      };
-      ret._$(ret.f);
-      v && ret.z.connect(ac.destination);
-      return ret;
-    },
-
-    // now will return the AudioContext's current time in seconds.
-    now: () => ac.currentTime,
-
-    /*
-    * Primitives and bases:
-    */
-
-    /*
-    * Intermediate building-blocks:
-    */
-    _ModuleBaseAmp (gainVal=1) {
-      let ret = {
-        ...U._ModuleBase(),
-        z: ac.createGain(),
-        // +g
-
-        // Disconnects the audio output to allow garbage collection.
-        // TODO: Expand this to stop oscillators, etc.
-        del() {
-          this.z.disconnect();
+        else {
+          Z.v.vT(freq, onTime);
         }
-      };
-      ret._addParam(U._ParamValue('g', ret.z.gain, ret, gainVal));
-      return ret;
-    },
-    _ParamValue: (name, obj, module, defVal /*opt.*/) => ({
-      ...U._Param(name, obj, module, defVal),
-      vC(value) {
-        obj.value = value;
+        Z._prevFreq = freq;
+      }
+    }
+
+    // Allow for triggering via a similar mechanism as used for connecting audio:
+    module._addParam(U._ParamAudio(module, module, t$));
+    return module;
+  }
+
+  /**
+   * Voice represents a single channel of sound that is controlled by one main frequency.
+   * The gain g is the final "volume control" and its output is the AudioContext's destination.
+   * Set v to zero to disable attaching to this.audioContext.destination. You can get final WebAudio from .z.
+   * An automatically generated frequency controller is available at .f.
+   * @param {number | MinuteSynth.SynthModule | []  | undefined} g - Gain (default: 0.5)
+   * @param {boolean | undefined} v - Whether to connect the voice to the AudioContext destination (default: true)
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} p - default frequency
+   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input for frequency control
+   * @returns {MinuteSynth.SynthModule} An instance of a voice module
+   */
+  Voice({ g = 0.5, v = true, p, r$ } = {}) {
+    // TODO: Allow inputs to be registrants
+    const module = class Voice extends this._BaseAmp {
+      _modules = [] // Modules registered to receive on/off triggers
+      f = this.minuteSynth.Freq({p, t$: this}) // Frequency control module
+      constructor() {
+        super(g)
+        this._addParam(new this._ParamAudio(this.z, this, r$))
+      }
+    let ret = {
+      ...U.Gain({g, r$}),
+      _modules: [],
+
+      // f is the Voice's main frequency control. Set it by calling on().
+      f: U.Freq({p}),
+
+      // _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
+      // connection. Return a nonzero to automatically remove values from input.
+      _$ (targetObj) {
+        this.rg(targetObj);
+        return 0;
       },
-      vT(value, startTime) {
-        obj.setValueAtTime(value, startTime);
+
+      // rg() allows a module to be registered with this voice to receive trigger events.
+      // The preferred way is to attach Voice to registered modules with .$()
+      // TODO: Singular "passthrough" register that returns the same object. Or return if single item.
+      rg (...modules) {
+        this._modules.push.apply(this._modules, modules);
+        return modules[0];
       },
-      lT(value, endTime) {
-        obj.linearRampToValueAtTime(value, endTime);
-      },
-      eT(value, endTime) {
-        obj.exponentialRampToValueAtTime((Math.abs(value) < 1e-4) ? 1e-4 : value, endTime);
-      },
-      t(value, startTime, tc) { // tc: Use 1/3 for 95% over 1 sec.
-        obj.setTargetAtTime(value, startTime, tc);
-      },
+
       /*
-      cv(values, startTime, dur) {
-        obj.setValueCurveAtTime(values, startTime, dur);
+      // Removes Modules from the Voice's triggering control.
+      deregister(...modules) {
+        modules.forEach(module => this.modules.splice(this.modules.indexOf(module), 1));
       },
       */
-      c(startTime) {
-        obj.cancelScheduledValues(startTime);
+
+      // This will call on() for all Modules registered.
+      on (onTime, freq) {
+        !onTime && (onTime = this.minuteSynth.now())
+        this._modules.forEach(module => module.on && module.on(onTime, freq));
       },
-      h(holdTime) {
-        obj.cancelAndHoldAtTime(holdTime);
+
+      // This will call off() for all Modules registered.
+      off (offTime) {
+        !offTime && (offTime = this.minuteSynth.now())
+        this._modules.forEach(module => module.off && module.off(offTime));
       },
-      z0() {
-        this.vC(0);
-      }
-    }),
+    };
+    ret._$(ret.f);
+    v && ret.z.connect(ac.destination);
+    return ret;
+  }
 
-    // ParamAudio allows access for audio inputs to a module.
-    _ParamAudio: (obj, module, defVal, paramName='in') => ({
-      ...U._Param(paramName, obj, module, defVal),
-      z0() {
-        obj.value = 0;
-      }
-    }),
+  /**
+   * now will return the AudioContext's current time in seconds.
+   * @returns {number} The current time of the AudioContext in seconds.
+   */
+  now() {
+    return this.audioContext.currentTime
+  }
 
-    // ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
-    // -1 to defer starting, 0 to autostart now, and other to start at specified time.
-    _ParamStart (obj, module, startTime, defVal) {
-      let ret = {
-        ...U._Param('s', obj, module, defVal),
-        go(startTime) {
-          obj.start(startTime);
-        },
-        no(stopTime) {
-          obj.stop(stopTime);
-          // TODO: Consider scheduling an object kill() at stopTime
-        }
-      };
-      if (startTime != -1) {
-        ret.go((startTime == 0) ? U.now() : startTime);
-      }
-      return ret;
-    },
+  // -- Support functions: --
 
-    /*
-     * Support functions:
-     */
-    // reverb() is a simple reverb effect, borrowed from
-    // https://github.com/adelespinasse/reverbGen/blob/master/reverbgen.js
-    reverb (fadeInTime, decayTime, subsample, numChan=2) {
-      // params.decayTime is the -60dB fade time. We let it go 50% longer to get to -90dB.
-      let totalTime = decayTime * 1.5,
-        decaySampleFrames = ~~(decayTime * U.SR),
-        fadeInSampleFrames = ~~(fadeInTime * U.SR),
-          // 60dB is a factor of 1 million in power, or 1000 in amplitude.
-        decayBase = 1e-3 ** (1 / decaySampleFrames),
-        reverbIR = U.Buf({c: numChan, T: totalTime}),
-        i, j, chan;
-      for (i = 0; i < numChan; i++) {
-        chan = reverbIR.mem(i);
-        for (j = 0; j < reverbIR.N; j++) {
-          chan[j] = ($R(1, 0) > subsample) ? $R() * decayBase ** j : 0;
-        }
-        for (j = 0; j < fadeInSampleFrames; j++) {
-          chan[j] *= j / fadeInSampleFrames;
-        }
+  /**
+   * reverb() is a simple reverb effect, borrowed from
+   * https://github.com/adelespinasse/reverbGen/blob/master/reverbgen.js
+   * @param {number} fadeInTime - The time it takes for the reverb to fade in
+   * @param {number} decayTime - The time it takes for -60dB fadeout
+   * @param {number} subsample - The subsample rate for the reverb
+   * @param {number | undefined} numChan - The number of channels for the reverb (default: 2)
+   * @returns {AudioBuffer} The reverb buffer
+   */
+  reverb(fadeInTime, decayTime, subsample, numChan = 2) {
+    // params.decayTime is the -60dB fade time. We let it go 50% longer to get to -90dB.
+    const totalTime = decayTime * 1.5
+    const decaySampleFrames = ~~(decayTime * this.audioContext.sampleRate)
+    const fadeInSampleFrames = ~~(fadeInTime * this.audioContext.sampleRate)
+    // 60dB is a factor of 1 million in power, or 1000 in amplitude.
+    const decayBase = 1e-3 ** (1 / decaySampleFrames)
+    const reverbIR = this.Buf({ c: numChan, T: totalTime })
+    for (let i = 0; i < numChan; i++) {
+      let chan = reverbIR.mem(i)
+      for (let j = 0; j < reverbIR.N; j++) {
+        chan[j] = (Math.random() > subsample) ? (Math.random() * 2 - 1) * decayBase ** j : 0
       }
-      return reverbIR.b;
-    },
-
-    // dw is a simple distortion effect used by the Distortion module that "warms" waves through a sigmoid,
-    // borrowed from https://stackoverflow.com/questions/22312841/waveshaper-node-in-webaudio-how-to-emulate-distortion
-    dw (amount=50, W=8192) {
-      let curve = new Float32Array(W),
-        deg = Math.PI / 180,
-        i = 0,
-        x;
-      for (; i < W; ++i) {
-        x = i * 2 / W - 1;
-        curve[i] = (3 + amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x));
+      for (let j = 0; j < fadeInSampleFrames; j++) {
+        chan[j] *= j / fadeInSampleFrames
       }
-      return curve;
     }
-  }));
-})();
+    return reverbIR.b
+  }
+
+  /**
+   * dw is a simple distortion effect used by the Distortion module that "warms" waves through a sigmoid,
+   * borrowed from https://stackoverflow.com/questions/22312841/waveshaper-node-in-webaudio-how-to-emulate-distortion
+   * @param {number} amount - The amount of distortion to apply
+   * @param {number} W - The width of the distortion curve
+   * @returns {Float32Array} The distortion curve
+   */
+  dw(amount = 50, W = 8192) {
+    const curve = new Float32Array(W)
+    const deg = Math.PI / 180
+    for (let i = 0; i < W; ++i) {
+      let x = i * 2 / W - 1
+      curve[i] = (3 + amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x))
+    }
+    return curve
+  }
+}
