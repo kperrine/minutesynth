@@ -828,28 +828,27 @@ class MinuteSynth {
    * @returns {MinuteSynth.SynthModule} An instance of a frequency control module
    */
   Freq({ p = 0, t$ } = {}) {
-    const module
-    let module = {
-      ...U.C(),
-      p,
-      _prevFreq: 0,
+    // TODO: Try to extend a class for more conciseness and consistency with other modules
+    const module = this.C()
+    module.p = p
+    module._prevFreq = 0
 
-      // on is called manually or by the Voice to set the next frequency.
-      on (onTime, freq) {
-        // TODO: Can we use setTarget with 0 time constant?
-        const Z = this;
-        if (Z._prevFreq && Z.p) {
-          Z.v.t(freq, onTime, Z.p / 3);
-        }
-        else {
-          Z.v.vT(freq, onTime);
-        }
-        Z._prevFreq = freq;
+    /** 
+     * on() is called manually or by the Voice to set the next frequency.
+     */
+    module.on = (onTime, freq) => {
+      // TODO: Can we use setTarget with 0 time constant?
+      if (module._prevFreq && module.p) {
+        module.v.t(freq, onTime, module.p / 3)
       }
+      else {
+        module.v.vT(freq, onTime)
+      }
+      module._prevFreq = freq
     }
 
     // Allow for triggering via a similar mechanism as used for connecting audio:
-    module._addParam(U._ParamAudio(module, module, t$));
+    module._addParam(new this._ParamAudio(module, module, t$))
     return module;
   }
 
@@ -865,58 +864,57 @@ class MinuteSynth {
    * @returns {MinuteSynth.SynthModule} An instance of a voice module
    */
   Voice({ g = 0.5, v = true, p, r$ } = {}) {
+    // TODO: Try to extend the class for more conciseness and consistency with other modules
     // TODO: Allow inputs to be registrants
-    const module = class Voice extends this._BaseAmp {
-      _modules = [] // Modules registered to receive on/off triggers
-      f = this.minuteSynth.Freq({p, t$: this}) // Frequency control module
-      constructor() {
-        super(g)
-        this._addParam(new this._ParamAudio(this.z, this, r$))
-      }
-    let ret = {
-      ...U.Gain({g, r$}),
-      _modules: [],
+    const module = this.Gain({ g, r$ })
+    module._modules = [] // Modules registered to receive on/off triggers
+    module.f = this.Freq({p}) // Frequency control module. Set it by calling on().
 
-      // f is the Voice's main frequency control. Set it by calling on().
-      f: U.Freq({p}),
+    /**
+     * _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
+     * connection. Return a nonzero to automatically remove values from input.
+     */
+    module._$ = (targetObj) => {
+      module.rg(targetObj)
+      return 0
+    }
 
-      // _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
-      // connection. Return a nonzero to automatically remove values from input.
-      _$ (targetObj) {
-        this.rg(targetObj);
-        return 0;
-      },
+    /**
+     * rg() allows a module to be registered with this voice to receive trigger events.
+     * The preferred way is to attach Voice to registered modules with .$()
+     */
+    // TODO: Singular "passthrough" register that returns the same object. Or return if single item.
+    module.rg = (...modules) => {
+      module._modules.push.apply(module._modules, modules)
+      return modules[0]
+    }
 
-      // rg() allows a module to be registered with this voice to receive trigger events.
-      // The preferred way is to attach Voice to registered modules with .$()
-      // TODO: Singular "passthrough" register that returns the same object. Or return if single item.
-      rg (...modules) {
-        this._modules.push.apply(this._modules, modules);
-        return modules[0];
-      },
+    /**
+     * Removes Modules from the Voice's triggering control.
+     */
+    module.deregister = (...modules) => {
+      modules.forEach(module => module._modules.splice(module._modules.indexOf(module), 1))
+    }
 
-      /*
-      // Removes Modules from the Voice's triggering control.
-      deregister(...modules) {
-        modules.forEach(module => this.modules.splice(this.modules.indexOf(module), 1));
-      },
-      */
+    /**
+     * This will call on() for all Modules registered.
+     */
+    module.on = (onTime, freq) => {
+      !onTime && (onTime = this.minuteSynth.now())
+      module._modules.forEach(module => module.on && module.on(onTime, freq))
+    }
 
-      // This will call on() for all Modules registered.
-      on (onTime, freq) {
-        !onTime && (onTime = this.minuteSynth.now())
-        this._modules.forEach(module => module.on && module.on(onTime, freq));
-      },
+    /**
+     * This will call off() for all Modules registered.
+     */
+    module.off = (offTime) => {
+      !offTime && (offTime = this.minuteSynth.now())
+      module._modules.forEach(module => module.off && module.off(offTime))
+    }
 
-      // This will call off() for all Modules registered.
-      off (offTime) {
-        !offTime && (offTime = this.minuteSynth.now())
-        this._modules.forEach(module => module.off && module.off(offTime));
-      },
-    };
-    ret._$(ret.f);
-    v && ret.z.connect(ac.destination);
-    return ret;
+    module._$(module.f) // Attach frequency control to the voice
+    v && module.z.connect(this.audioContext.destination) // Attach to destination
+    return module
   }
 
   /**
