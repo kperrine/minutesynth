@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<head>
+	<title>MinuteSynth Bepp Example</title>
+    <script src="minutesynth.js"></script>
+    <script>
+var msInstance
+
+function init() {
+    msInstance = new MinuteSynth()
+}
+
+function play(voiceName) {
+    // The audio output will only work after a user interaction event.
+    if (!msInstance) {
+        init()
+    }
+
+    // Build up a basic square wave, fixed at 800 Hz. It is started by default.
+    const osc = msInstance.Osc({
+        t: 'square',
+        f: 800  // Other examples show how to patch in a variable frequency here.
+    })
+    const voice = msInstance.Voice()
+    osc.$(voice) // Connect the output of the osc to the voice
+
+    // Stop the oscillator after 0.5 seconds by un-patching. Better ways would be
+    // to use osc.s.stop() to schedule the oscillator to stop, or to let the
+    // oscillator run indefinitely, and control the gain of the oscillator or voice.
+    setTimeout(() => osc.detach(voice), 500)
+}
+    </script>	
+</head>
+<body>
+    <table>
+        <tr><td colspan=2><b>MinuteSynth Beep Example</b></td></tr>
+        <tr><td><button onclick="play()">Play</button></td><td>Play a half/second beep</td></tr>
+    </table>
+</body>
+</html>

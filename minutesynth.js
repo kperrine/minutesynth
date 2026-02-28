@@ -131,9 +131,9 @@ class MinuteSynth {
        */
       detach(inModule) {
         for (let module of [...this._inModules]) { // Iterate over copy
-          if (!inModule || (module == inModule)) {
-            [].concat(this._obj).forEach(obj => module.out.detach(obj))
-            this._inModules.splice(this._inModules.indexOf(inModule), 1)
+          if (!inModule || (module === inModule)) {
+            [].concat(this._obj).forEach(obj => module.z.disconnect(obj))
+            inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
           }
         }
       }
@@ -232,7 +232,7 @@ class MinuteSynth {
        * Stop at the specified time, or immediately if stopTime is 0 or not provided
        * @param {number | undefined} stopTime 
        */
-      no(stopTime = 0) {
+      stop(stopTime = 0) {
         this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
         // TODO: Consider scheduling an object kill() at stopTime
       }
@@ -293,8 +293,8 @@ class MinuteSynth {
      */
     detach(tgtModule, paramName) {
       for (let param of [...this._outParams]) {
-        if (!tgtModule || (param.base == tgtModule)) {
-          if (!paramName || (param.name == paramName)) {
+        if (!tgtModule || (param.synthModule === tgtModule)) {
+          if (!paramName || (param._name === paramName)) {
             param.detach(this)
             this._outParams.splice(this._outParams.indexOf(param), 1)
           }
@@ -339,7 +339,7 @@ class MinuteSynth {
       this._S = this.minuteSynth.Gain()
       if (!isNaN(defFreq)) {
         // If the default value is a number, then create a constant for it:
-        this._C = U.C(defFreq)
+        this._C = this.minuteSynth.C(defFreq)
         // TODO: Inherit the parameters rather than recreating.
         this._addParam(new this.ParamValue('f', this._C.z.offset, defFreq))
         this._C.$(this._S)
