@@ -48,93 +48,204 @@ class MinuteSynth {
   NOISE_LEN = 1.0
 
   /**
-   * _SynthModule is a base class for modules that are bound to this MinuteSynth instance.
-   * @type {typeof MinuteSynth.SynthModule}
-   */
-  _SynthModule
-
-  /** @type {typeof MinuteSynth.BaseAmp} */
-  _BaseAmp
-
-  /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
    * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
    */
   constructor(ac = new ACX()) {
     this.audioContext = ac
     this.sampleRate = ac.sampleRate
-
-    const moduleClassMixin = baseClass => class extends baseClass {
-      minuteSynth = this
-    }
-
-    // Make dynamic base classes that are tied to the AudioContext:
-    this._SynthModule = moduleClassMixin(MinuteSynth.SynthModule)
-    this._BaseAmp = moduleClassMixin(MinuteSynth.BaseAmp)
   }
 
   /**
    * Base return type for MinuteSynth modules that expose a series of patchable
    * parameters
    */
-  static SynthModule = class {
-    /** @type {typeof SynthModule._ParamAudio} */
-    _ParamAudio
-
-    /** @type {typeof SynthModule._ParamValue} */
-    _ParamValue
-
-    /** @type {typeof SynthModule._ParamStart} */
-    _ParamStart
-
+  SynthModule = class {
     /**
      * minuteSynth is a reference to the parent MinuteSynth instance
      * @type {MinuteSynth}
      */
-    minuteSynth
+    minuteSynth = this
 
     /**
      * collection of parameters for this module
-     * @type {Object.<string, SynthModule._Param>}
+     * @type {Object.<string, Param>}
      */
     _params
 
     /**
      * outParams is a list of parameters that this module is attached to
-     * @type {SynthModule._Param[]}
+     * @type {Param[]}
      */
     _outParams
 
-    constructor() {
-      assert(this.minuteSynth, "SynthModule must be constructed from a MinuteSynth instance.")
-      this._params = {}
-      this._outParams = []
+    /**
+     * Represents a parameter that allows for attachment to another module or constant as input
+     */
+    Param = class {
+      /** @type {SynthModule[]} */
+      _inModules
 
-      const paramClassMixin = baseClass => class extends baseClass {
-        synthModule = this
+      /** @type {SynthModule} */
+      synthModule = this
+
+      /**
+       * Cretes a parameter that allows for attachment to another module
+       * @param {string} name
+       * @param {AudioParam} obj
+       * @param {number | string} defVal 
+       */
+      constructor(name, obj, defVal) {
+        this._name = name
+        this._obj = obj
+        this._defVal = defVal
+        this._inModules = []
+        // TODO: Call _addParam() from here because we have our SynthModule reference.
       }
-      this._ParamAudio = paramClassMixin(MinuteSynth._ParamAudio)
-      this._ParamValue = paramClassMixin(MinuteSynth._ParamValue)
-      this._ParamStart = paramClassMixin(MinuteSynth._ParamStart)
+
+      /**
+       * "Reverse attach:" Attach a source module to this parameter. If it is a Voice,
+       * then register the voice.
+       * @param {number | SynthModule | [] | undefined} srcModules
+       * @return {Param} The current parameter object, to allow for chaining.
+       */  
+      r$(srcModules) {
+        for (let module of [].concat(srcModules)) {
+          if (!isNaN(module)) {
+            module = this.synthModule.minuteSynth.C(module)
+          }
+          this._inModules.push(module)
+          if (module._$(this._obj)) {
+            this.z0 && this.z0()
+          }
+        }
+        return this
+      }
+
+      /**
+       * Remove an incoming connection by incoming module reference, or all if no parameter specified
+       * @param {SynthModule | undefined} inModule 
+       */
+      detach(inModule) {
+        for (let module of [...this._inModules]) { // Iterate over copy
+          if (!inModule || (module == inModule)) {
+            [].concat(this._obj).forEach(obj => module.out.detach(obj))
+            this._inModules.splice(this._inModules.indexOf(inModule), 1)
+          }
+        }
+      }
     }
 
-    /**
-     * Internal method for deriving a parameter class that is tied with this module
-     * @param {typeof SynthModule._Param} baseClass
-     * @returns {typeof SynthModule._Param} Param variant tied with this class
-     */
-    _paramClassMixin(baseClass) {
-      return class extends baseClass {
-        synthModule = this
+    ParamValue = class extends this.Param {
+      /**
+       * Cretes a parameter that represents a time-varying value
+       * @param {string} name 
+       * @param {AudioParam} obj
+       * @param {number | string} defVal 
+       */
+      constructor(name, obj, defVal) {
+        super(name, obj, defVal)
       }
+
+      vC(value) {
+        this._obj.value = value
+      }
+
+      vT(value, startTime) {
+        this._obj.setValueAtTime(value, startTime)
+      }
+
+      lT(value, endTime) {
+        this._obj.linearRampToValueAtTime(value, endTime)
+      }
+
+      eT(value, endTime) {
+        this._obj.exponentialRampToValueAtTime((Math.abs(value) < 1e-4) ? 1e-4 : value, endTime)
+      }
+
+      t(value, startTime, tc) { // tc: Use 1/3 for 95% over 1 sec.
+        this._obj.setTargetAtTime(value, startTime, tc)
+      }
+      
+      cv(values, startTime, dur) {
+        this._obj.setValueCurveAtTime(values, startTime, dur)
+      }
+      
+      c(startTime) {
+        this._obj.cancelScheduledValues(startTime)
+      }
+
+      h(holdTime) {
+        this._obj.cancelAndHoldAtTime(holdTime)
+      }
+
+      z0() {
+        this.vC(0)
+      }
+    }
+
+    ParamAudio = class extends this.Param {
+      /**
+       * Cretes a parameter that represents an audio input
+       * @param {AudioParam} obj
+       * @param {number | string} defVal 
+       * @param {string | undefined} paramName 
+       */
+      constructor(obj, defVal, paramName = 'in') {
+        super(paramName, obj, defVal)
+      }
+
+      z0() {
+        this._obj.value = 0
+      }
+    }
+
+    // ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
+    // -1 to defer starting, 0 to autostart now, and other to start at specified time.
+    ParamStart = class extends this.Param {
+      /**
+       * Cretes a parameter that allows for start/stop control
+       * @param {AudioParam} obj
+       * @param {number} startTime - -1 to defer, 0 to autostart now, and other to start at specified time.
+       * @param {number | undefined} defVal 
+       */
+      constructor(obj, startTime, defVal = 0) {
+        super('s', obj, defVal)
+        this._startTime = startTime
+        if (startTime != -1) {
+          this.go(startTime)
+        }
+      }
+
+      /**
+       * Start at the specified time, or immediately if startTime is 0 or not provided
+       * @param {number | undefined} startTime 
+       */
+      go(startTime = 0) {
+        this._obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
+      }
+
+      /**
+       * Stop at the specified time, or immediately if stopTime is 0 or not provided
+       * @param {number | undefined} stopTime 
+       */
+      no(stopTime = 0) {
+        this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
+        // TODO: Consider scheduling an object kill() at stopTime
+      }
+    }
+
+    constructor() {
+      this._params = {}
+      this._outParams = []
     }
 
     /**
      * Attaches this module to a parameter (or main input) of a downstream module. tgtThing can either be
      * a Module or a Param.
-     * @param {MinuteSynth.SynthModule | MinuteSynth._Param} tgtThing 
+     * @param {SynthModule | Param} tgtThing 
      * @param {string | undefined} tgtParamName - Optional parameter name to attach to if tgtThing is a module. Defaults to "in".
-     * @returns {MinuteSynth.SynthModule} The target module, to allow for chaining.
+     * @returns {SynthModule} The target module, to allow for chaining.
      */
     $(tgtThing, tgtParamName) {
       // TODO: Add option to inherit parameters from target, if target is a module. Don't copy "in", and
@@ -152,7 +263,7 @@ class MinuteSynth {
 
     /**
      * A "reverse attach", which will allow one or more source modules to attach to this module
-     * @param {number | MinuteSynth.SynthModule | [] | undefined} srcModules - The source module(s) to attach.
+     * @param {number | SynthModule | [] | undefined} srcModules - The source module(s) to attach.
      * @param {string | undefined} thisParamName - Parameter name to attach to if this module has multiple parameters. Defaults to "in".
      */
     r$(srcModules, thisParamName) {
@@ -179,7 +290,7 @@ class MinuteSynth {
     /**
      * Removes an outgoing connection by target module reference, parameter name, or both.
      * If no parameters are specified, then all outgoing connections are removed.
-     * @param {MinuteSynth.SynthModule | null | undefined} tgtModule 
+     * @param {SynthModule | null | undefined} tgtModule 
      * @param {string | null | undefined} paramName 
      */
     detach(tgtModule, paramName) {
@@ -202,9 +313,10 @@ class MinuteSynth {
 
     /**
      * Associates the given parameter with this module, making it accessible by name
-     * @param {MinuteSynth._Param} param
-     * @return {MinuteSynth._Param} The parameter that was added, to allow for chaining
+     * @param {Param} param
+     * @return {Param} The parameter that was added, to allow for chaining
      */
+    // TODO: Investigate whether we can call this from Param constructor...
     _addParam(param) {
       this._params[param._name] = param
       this[param._name] = param
@@ -226,189 +338,32 @@ class MinuteSynth {
      */
     _addFreqHelper(control, defFreq = 0) {
       control.value = 0
-      this._S = U.Gain()
+      this._S = this.minuteSynth.Gain()
       if (!isNaN(defFreq)) {
         // If the default value is a number, then create a constant for it:
         this._C = U.C(defFreq)
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(U._ParamValue('f', this._C.z.offset, this, defFreq))
+        this._addParam(this.ParamValue('f', this._C.z.offset, this, defFreq))
         this._C.$(this._S)
       }
       else {
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(U._ParamValue('f', this._S.z, this, defFreq))
+        this._addParam(this.ParamValue('f', this._S.z, this, defFreq))
       }
-      this._addParam(U._ParamValue('S', this._S.z.gain, this, this._calcSCRate(1)))
+      this._addParam(this.ParamValue('S', this._S.z.gain, this, this._calcSCRate(1)))
       this._S.z.connect(control)
     }
   }
 
-  /**
-   * Represents a parameter that allows for attachment to another module or constant as input
-   */
-  static _Param = class {
-    /** @type {MinuteSynth.SynthModule[]} */
-    _inModules
-
-    /** @type {MinuteSynth.SynthModule} */
-    synthModule
-
-    /**
-     * Cretes a parameter that allows for attachment to another module
-     * @param {string} name
-     * @param {AudioParam} obj
-     * @param {number | string} defVal 
-     */
-    constructor(name, obj, defVal) {
-      assert(this.synthModule, "_Param must be constructed from a SynthModule instance.")
-
-      this._name = name
-      this._obj = obj
-      this._defVal = defVal
-      this._inModules = []
-    }
-
-    /**
-     * "Reverse attach:" Attach a source module to this parameter. If it is a Voice,
-     * then register the voice.
-     * @param {number | MinuteSynth.SynthModule | [] | undefined} srcModules
-     * @return {MinuteSynth._Param} The current parameter object, to allow for chaining.
-     */  
-    r$(srcModules) {
-      for (let module of [].concat(srcModules)) {
-        if (!isNaN(module)) {
-          module = this.synthModule.minuteSynth.C(module)
-        }
-        this._inModules.push(module)
-        if (module._$(this._obj)) {
-          this.z0 && this.z0()
-        }
-      }
-      return this
-    }
-
-    /**
-     * Remove an incoming connection by incoming module reference, or all if no parameter specified
-     * @param {MinuteSynth.SynthModule | undefined} inModule 
-     */
-    detach(inModule) {
-      for (let module of [...this._inModules]) { // Iterate over copy
-        if (!inModule || (module == inModule)) {
-          [].concat(this._obj).forEach(obj => module.out.detach(obj))
-          this._inModules.splice(this._inModules.indexOf(inModule), 1)
-        }
-      }
-    }
-  }
-
-  static _ParamValue = class extends MinuteSynth._Param {
-    /**
-     * Cretes a parameter that represents a time-varying value
-     * @param {string} name 
-     * @param {AudioParam} obj
-     * @param {number | string} defVal 
-     */
-    constructor(name, obj, defVal) {
-      super(name, obj, defVal)
-    }
-
-    vC(value) {
-      this._obj.value = value
-    }
-
-    vT(value, startTime) {
-      this._obj.setValueAtTime(value, startTime)
-    }
-
-    lT(value, endTime) {
-      this._obj.linearRampToValueAtTime(value, endTime)
-    }
-
-    eT(value, endTime) {
-      this._obj.exponentialRampToValueAtTime((Math.abs(value) < 1e-4) ? 1e-4 : value, endTime)
-    }
-
-    t(value, startTime, tc) { // tc: Use 1/3 for 95% over 1 sec.
-      this._obj.setTargetAtTime(value, startTime, tc)
-    }
-    
-    cv(values, startTime, dur) {
-      this._obj.setValueCurveAtTime(values, startTime, dur)
-    }
-    
-    c(startTime) {
-      this._obj.cancelScheduledValues(startTime)
-    }
-
-    h(holdTime) {
-      this._obj.cancelAndHoldAtTime(holdTime)
-    }
-
-    z0() {
-      this.vC(0)
-    }
-  }
-
-  static _ParamAudio = class extends MinuteSynth._Param {
-    /**
-     * Cretes a parameter that represents an audio input
-     * @param {AudioParam} obj
-     * @param {number | string} defVal 
-     * @param {string | undefined} paramName 
-     */
-    constructor(obj, defVal, paramName = 'in') {
-      super(paramName, obj, defVal)
-    }
-
-    z0() {
-      this._obj.value = 0
-    }
-  }
-
-  // ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
-  // -1 to defer starting, 0 to autostart now, and other to start at specified time.
-  static _ParamStart = class extends MinuteSynth._Param {
-    /**
-     * Cretes a parameter that allows for start/stop control
-     * @param {AudioParam} obj
-     * @param {number} startTime - -1 to defer, 0 to autostart now, and other to start at specified time.
-     * @param {number | undefined} defVal 
-     */
-    constructor(obj, startTime, defVal = 0) {
-      super('s', obj, defVal)
-      this._startTime = startTime
-      if (startTime != -1) {
-        this.go(startTime)
-      }
-    }
-
-    /**
-     * Start at the specified time, or immediately if startTime is 0 or not provided
-     * @param {number | undefined} startTime 
-     */
-    go(startTime = 0) {
-      this._obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
-    }
-
-    /**
-     * Stop at the specified time, or immediately if stopTime is 0 or not provided
-     * @param {number | undefined} stopTime 
-     */
-    no(stopTime = 0) {
-      this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
-      // TODO: Consider scheduling an object kill() at stopTime
-    }
-  }
-
-  static BaseAmp = class extends MinuteSynth.SynthModule {
+  BaseAmp = class extends this.SynthModule {
     /**
      * Establishes a base module with a gain node for controlling output level (default unity gain)
      * @param {number | undefined} gainVal - Default gain, including negative values to flip the waveform
      */
     constructor(gainVal = 1) {
       super()
-      this.z = this.minuteSynthaudioContext.createGain()
-      this._addParam(new this._ParamValue('g', this.z.gain, gainVal))
+      this.z = this.minuteSynth.audioContext.createGain()
+      this._addParam(new this.ParamValue('g', this.z.gain, gainVal))
     }
   }
 
@@ -429,17 +384,17 @@ class MinuteSynth {
    * triggered. Specify r and i arrays for periodic wave.
    * @param {number | string} t - Type of waveform, can use WaveType lookup
    * @param {number | undefined} S - scale (default: 1)
-   * @param {number | MinuteSynth.SynthModule | []} f - default frequency
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} d - detune (default: 0)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | SynthModule | []} f - default frequency
+   * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
    * @param {Float32Array | undefined} r - real values
    * @param {Float32Array | undefined} i - imag. values
    * @param {number | undefined} n - nominal playback frequncy (for custom waveform)
-   * @returns {MinuteSynth.SynthModule} An instance of an oscillator module
+   * @returns {SynthModule} An instance of an oscillator module
    */
   Osc({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
-    const Module = class Osc extends this._BaseAmp {
+    const Module = class Osc extends this.BaseAmp {
       o = this.audioContext.createOscillator()
       _calcSCRate = freq => freq * S / n
 
@@ -451,8 +406,8 @@ class MinuteSynth {
         if (r) {
           this.o.setPeriodicWave(this.audioContext.createPeriodicWave(r, i))
         }
-        this._addParam(new this._ParamStart(this.o, s))
-        this._addParam(new this._ParamValue('d', this.o.detune, d))
+        this._addParam(new this.ParamStart(this.o, s))
+        this._addParam(new this.ParamValue('d', this.o.detune, d))
         this._addFreqHelper(this.o.frequency, f)
         this.o.connect(this.z)
       }
@@ -466,16 +421,16 @@ class MinuteSynth {
    * @param {number | undefined} T - duration of the buffer in seconds (default: 1)
    * @param {number | undefined} c - number of channels (default: 1)
    * @param {number | undefined} S - scale (default: 1)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
    * @param {number | undefined} F - sampling rate (default: AudioContext's sample rate)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r - playback rate (default: 1)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} d - detune (default: 0)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
-   * @returns {MinuteSynth.SynthModule} An instance of a buffer module
+   * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
+   * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
+   * @param {number | SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
+   * @returns {SynthModule} An instance of a buffer module
    */
   Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0 }) {
-    const Module = class Buf extends this._BaseAmp {
+    const Module = class Buf extends this.BaseAmp {
       b = this.audioContext.createBuffer(c, ~~(F * T), F)
       B = this.audioContext.createBufferSource()
       T = T
@@ -485,13 +440,13 @@ class MinuteSynth {
 
       constructor() {
         super(g)
-        this._addParam(new this._ParamStart(this.B, this, s))
-        this._addParam(new this._ParamValue('d', this.B.detune, d))
+        this._addParam(new this.ParamStart(this.B, this, s))
+        this._addParam(new this.ParamValue('d', this.B.detune, d))
         if (n) {
           this._addFreqHelper(this.B.playbackRate, n)
         }
         else {
-          this._addParam(new this._ParamValue('r', this.B.playbackRate, r))
+          this._addParam(new this.ParamValue('r', this.B.playbackRate, r))
         }
         this.B.connect(this.z)
         // TODO: n isn't used except for determing if we are frequency controlled.
@@ -520,11 +475,11 @@ class MinuteSynth {
 
   /**
    * Noise produces a playable buffer of noise.
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r - playback rate (default: 1)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} d - detune (default: 0)
-   * @returns {MinuteSynth.SynthModule} An instance of a noise module
+   * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
+   * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
+   * @returns {SynthModule} An instance of a noise module
    */
   Noise({ g = 1, s = 0, r, d } = {}) {
     const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0 })
@@ -542,10 +497,10 @@ class MinuteSynth {
    * @param {number | undefined} o - pulse offset (0-1); default: 0
    * @param {number | undefined} S - scale; default: 1
    * @param {number | undefined} f - default frequency; default: 440
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain; default: 1
+   * @param {number | SynthModule | [] | undefined} g - gain; default: 1
    * @param {number | undefined} s - start time; default: 0
    * @param {number | undefined} W - samples; default: 1024
-   * @returns {MinuteSynth.SynthModule} An instance of a pulse module
+   * @returns {SynthModule} An instance of a pulse module
    */
   Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
@@ -563,19 +518,19 @@ class MinuteSynth {
    * Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
    * @param {function(any): number[] | undefined} F - distort function (default: this.dw())
    * @param {number | undefined} a - default function parameter (default: 50)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input
-   * @return {MinuteSynth.SynthModule} An instance of a distortion module
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | SynthModule | [] | undefined} r$ - reverse-attach input
+   * @return {SynthModule} An instance of a distortion module
    */
   Dist({ a = 50, F = () => this.dw(a), g = 1, r$ }) {
     // TODO: Input param: y?
-    const module = class Dist extends this._BaseAmp {
+    const module = class Dist extends this.BaseAmp {
       w = this.minuteSynth.audioContext.createWaveShaper()
       constructor() {
         super(g)
         this.w.curve = F()
         this.w.oversample = '4x'
-        this._addParam(new this._ParamAudio(this.w, this, r$));
+        this._addParam(new this.ParamAudio(this.w, this, r$))
         this.w.connect(this.z)
       }
     }
@@ -599,24 +554,24 @@ class MinuteSynth {
   /**
    * Filt (Filter) allows for filtering of sound using the filter type provided in t.
    * @param {number | string} t - Type of filter, can use FilterType lookup
-   * @param {number | MinuteSynth.SynthModule | []} q - Q value
-   * @param {number | MinuteSynth.SynthModule | []} f - frequency
+   * @param {number | SynthModule | []} q - Q value
+   * @param {number | SynthModule | []} f - frequency
    * @param {number | undefined} S - scale (default: 1)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} b - boost
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
-   * @param {MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input
-   * @returns {MinuteSynth.SynthModule} An instance of a filter module
+   * @param {number | SynthModule | [] | undefined} b - boost
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {SynthModule | [] | undefined} r$ - reverse-attach input
+   * @returns {SynthModule} An instance of a filter module
    */
   Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
-    const module = class Filt extends this._BaseAmp {
+    const module = class Filt extends this.BaseAmp {
       q = this.minuteSynth.audioContext.createBiquadFilter()
       _calcSCRate = freq => freq * S
       constructor() {
         super(g)
         this.q.type = isNaN(t) ? t : ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
-        this._addParam(new this._ParamAudio(this.q, this, r$))
-        this._addParam(new this._ParamValue('Q', this.q.Q, this, q))
-        this._addParam(new this._ParamValue('b', this.q.gain, this, b))
+        this._addParam(new this.ParamAudio(this.q, this, r$))
+        this._addParam(new this.ParamValue('Q', this.q.Q, this, q))
+        this._addParam(new this.ParamValue('b', this.q.gain, this, b))
         this._addFreqHelper(this.q.frequency, f)
         this.q.connect(this.z)
       }
@@ -628,13 +583,13 @@ class MinuteSynth {
    * Conv (Convolver) sets up a convolution. A BufferNode object shall carry the convolution operation.
    * Use b: MinuteSynth.reverb() for a simple reverb effect.
    * @param {AudioBuffer} b - AudioBuffer containing the impulse response
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - Gain (default: 1)
+   * @param {number | SynthModule | [] | undefined} g - Gain (default: 1)
    * @param {boolean | undefined} n - Normalize (default: true)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - Reverse-attach input
-   * @returns {MinuteSynth.SynthModule} An instance of a convolver module
+   * @param {number | SynthModule | [] | undefined} r$ - Reverse-attach input
+   * @returns {SynthModule} An instance of a convolver module
    */
   Conv({ b, g = 1, n = true, r$ }) {
-    const Module = class Conv extends this._BaseAmp {
+    const Module = class Conv extends this.BaseAmp {
       c = this.minuteSynth.audioContext.createConvolver()
       b = b
 
@@ -642,7 +597,7 @@ class MinuteSynth {
         super(g)
         this.c.normalize = n
         this.c.buffer = this.b
-        this._addParam(new this._ParamAudio(this.c, this, r$))
+        this._addParam(new this.ParamAudio(this.c, this, r$))
         this.c.connect(this.z)
       }
     }
@@ -651,26 +606,26 @@ class MinuteSynth {
 
   /** 
    * Comp (Compressor) 
-   * @param {number | MinuteSynth.SynthModule | []} t - threshold
-   * @param {number | MinuteSynth.SynthModule | []} k - knee
-   * @param {number | MinuteSynth.SynthModule | []} o - ratio
-   * @param {number | MinuteSynth.SynthModule | []} a - attack
-   * @param {number | MinuteSynth.SynthModule | []} r - release
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input
-   * @return {MinuteSynth.SynthModule} An instance of a compressor module
+   * @param {number | SynthModule | []} t - threshold
+   * @param {number | SynthModule | []} k - knee
+   * @param {number | SynthModule | []} o - ratio
+   * @param {number | SynthModule | []} a - attack
+   * @param {number | SynthModule | []} r - release
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | SynthModule | [] | undefined} r$ - reverse-attach input
+   * @return {SynthModule} An instance of a compressor module
    */
   Comp ({ t, k, o, a, r, g=1, r$ }={}) {
-    const module = class Comp extends this._BaseAmp {
+    const module = class Comp extends this.BaseAmp {
       R = this.minuteSynth.audioContext.createDynamicsCompressor()
       constructor() {
         super(g)
-        this._addParam(new this._ParamAudio(this.R, this, r$))
-        this._addParam(new this._ParamValue('t', this.R.threshold, this, t))
-        this._addParam(new this._ParamValue('k', this.R.knee, this, k))
-        this._addParam(new this._ParamValue('o', this.R.ratio, this, o))
-        this._addParam(new this._ParamValue('a', this.R.attack, this, a))
-        this._addParam(new this._ParamValue('r', this.R.release, this, r))
+        this._addParam(new this.ParamAudio(this.R, this, r$))
+        this._addParam(new this.ParamValue('t', this.R.threshold, this, t))
+        this._addParam(new this.ParamValue('k', this.R.knee, this, k))
+        this._addParam(new this.ParamValue('o', this.R.ratio, this, o))
+        this._addParam(new this.ParamValue('a', this.R.attack, this, a))
+        this._addParam(new this.ParamValue('r', this.R.release, this, r))
         this.R.connect(this.z)
       }
     }
@@ -679,8 +634,8 @@ class MinuteSynth {
 
   /**
    * C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} v - The initial value of the constant (default: 0).
-   * @return {MinuteSynth.SynthModule} An instance of a constant source module.
+   * @param {number | SynthModule | [] | undefined} v - The initial value of the constant (default: 0).
+   * @return {SynthModule} An instance of a constant source module.
    */
   C(v = 0) {
     const Module = class C extends this._SynthModule {
@@ -688,7 +643,7 @@ class MinuteSynth {
 
       constructor() {
         super()
-        this._addParam(new this._ParamValue('v', this.z.offset, this, v))
+        this._addParam(new this.ParamValue('v', this.z.offset, this, v))
         this.z.start()
       }
     }
@@ -697,15 +652,15 @@ class MinuteSynth {
 
   /**
    * Gain (Amplifier) is a very simple module that acts as a multiplier.
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - The gain value (default: 1).
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - Optional input to be connected to the gain parameter.
-   * @return {MinuteSynth.SynthModule} An instance of a gain module.
+   * @param {number | SynthModule | [] | undefined} g - The gain value (default: 1).
+   * @param {number | SynthModule | [] | undefined} r$ - Optional input to be connected to the gain parameter.
+   * @return {SynthModule} An instance of a gain module.
    */
   Gain({ g = 1, r$ } = {}) {
-    const Module = class Gain extends this._BaseAmp {
+    const Module = class Gain extends this.BaseAmp {
       constructor() {
         super(g)
-        this._addParam(new this._ParamAudio(this.z, this, r$))
+        this._addParam(new this.ParamAudio(this.z, this, r$))
       }
     }
     return new Module()
@@ -716,8 +671,8 @@ class MinuteSynth {
    * can allow values to ramp up and down whenever the module is triggered. Use the t$ 
    * (second parameter) to reverse-bind a trigger.
    * @param {MinuteSynth.ADSRParams | object | undefined} adsr - The ADSR parameters to use for this module (default: this._DEFAULT_ADSR).
-   * @param {MinuteSynth.SynthModule | undefined} t$ - Optional trigger input for this module.
-   * @returns {MinuteSynth.SynthModule} An instance of an ADSR module.
+   * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
+   * @returns {SynthModule} An instance of an ADSR module.
    */
   ADSR(adsr = {}, t$) {
     const Module = class ADSR extends this._SynthModule {
@@ -729,7 +684,7 @@ class MinuteSynth {
         super()
 
         // Allow for triggering via a similar mechanism as used for connecting audio:
-        this._addParam(new this._ParamAudio(this, this, t$))
+        this._addParam(new this.ParamAudio(this, this, t$))
       }
 
       /**
@@ -780,7 +735,7 @@ class MinuteSynth {
    * @param {number[]} t - Timesteps (seconds from trigger) array
    * @param {number[]} v - Values array
    * @param {number | undefined} p - Portamento (glide) time (default: 0)
-   * @returns {MinuteSynth.SynthModule} An instance of a program module
+   * @returns {SynthModule} An instance of a program module
    */
   Prog({ t, v, p = 0 }) {
     const module = this.Freq({p})
@@ -800,11 +755,11 @@ class MinuteSynth {
    * @param {number[] | undefined} G - Array of gains (default: 1's)
    * @param {number | undefined} n - Nominal frequency
    * @param {number | undefined} R - Resolution (default: sample rate / 4)
-   * @param {number | MinuteSynth.SynthModule | []} f - default frequency
+   * @param {number | SynthModule | []} f - default frequency
    * @param {number | undefined} s - start time (default: 0)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} g - gain (default: 1)
+   * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} S - scale (default: sample rate / R)
-   * @returns {MinuteSynth.SynthModule} An instance of a spectrum module
+   * @returns {SynthModule} An instance of a spectrum module
    */
   Spec({ F, G, n = 440, R = this.audioContext.sampleRate / 4, f, s = 0, g = 1, S = 1 }) {
     const real = new Array(R).fill(0)
@@ -815,7 +770,7 @@ class MinuteSynth {
         real[j] = G ? G[i] : 1
       }
     }
-    const module = U.Osc({ r: real, i: imag, f, s, g, S: this.audioContext.sampleRate / R * S, n })
+    const module = this.Osc({ r: real, i: imag, f, s, g, S: this.audioContext.sampleRate / R * S, n })
     return module
   }
 
@@ -824,8 +779,8 @@ class MinuteSynth {
    * It centrally manages a frequency and optionally has a glide (portamento) capability.
    * Use the t$ (second parameter) to reverse-bind a trigger.
    * @param {number | undefined} p - Portamento (glide) time (default: 0)
-   * @param {MinuteSynth.SynthModule | undefined} t$ - Optional trigger input for this module.
-   * @returns {MinuteSynth.SynthModule} An instance of a frequency control module
+   * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
+   * @returns {SynthModule} An instance of a frequency control module
    */
   Freq({ p = 0, t$ } = {}) {
     // TODO: Try to extend a class for more conciseness and consistency with other modules
@@ -848,7 +803,7 @@ class MinuteSynth {
     }
 
     // Allow for triggering via a similar mechanism as used for connecting audio:
-    module._addParam(new this._ParamAudio(module, module, t$))
+    module._addParam(new this.ParamAudio(module, module, t$))
     return module;
   }
 
@@ -857,11 +812,11 @@ class MinuteSynth {
    * The gain g is the final "volume control" and its output is the AudioContext's destination.
    * Set v to zero to disable attaching to this.audioContext.destination. You can get final WebAudio from .z.
    * An automatically generated frequency controller is available at .f.
-   * @param {number | MinuteSynth.SynthModule | []  | undefined} g - Gain (default: 0.5)
+   * @param {number | SynthModule | []  | undefined} g - Gain (default: 0.5)
    * @param {boolean | undefined} v - Whether to connect the voice to the AudioContext destination (default: true)
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} p - default frequency
-   * @param {number | MinuteSynth.SynthModule | [] | undefined} r$ - reverse-attach input for frequency control
-   * @returns {MinuteSynth.SynthModule} An instance of a voice module
+   * @param {number | SynthModule | [] | undefined} p - default frequency
+   * @param {number | SynthModule | [] | undefined} r$ - reverse-attach input for frequency control
+   * @returns {SynthModule} An instance of a voice module
    */
   Voice({ g = 0.5, v = true, p, r$ } = {}) {
     // TODO: Try to extend the class for more conciseness and consistency with other modules
@@ -892,7 +847,7 @@ class MinuteSynth {
     /**
      * Removes Modules from the Voice's triggering control.
      */
-    module.deregister = (...modules) => {
+    module.drg = (...modules) => {
       modules.forEach(module => module._modules.splice(module._modules.indexOf(module), 1))
     }
 

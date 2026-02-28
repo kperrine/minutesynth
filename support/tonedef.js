@@ -21,7 +21,7 @@ const ToneDefs = {
       const adsr = M$.ADSR({ a: 0.5, d: 0.5, s: 0.5, r: 2 }, voice)
       
       // Finish up, using the Voice's frequency generator attribute:
-      const osc = M$.Osc({ t: M$.square, f: voice.f, g: adsr })
+      const osc = M$.Osc({ t: MinuteSynth.WaveType.SQUARE, f: voice.f, g: adsr })
       osc.$(voice)
 
       return voice
