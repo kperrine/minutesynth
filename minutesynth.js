@@ -675,10 +675,10 @@ class MinuteSynth {
   ADSR(adsr = {}, t$) {
     // TODO: Try to extend a class for more conciseness and consistency with other modules
     const module = this.C()
-    module.a = { ...this._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
+    module.a = { ...MinuteSynth._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
     module._offState = true
     module._newState = true
-    module._addParam(new module.ParamAudio(module.v, t$))
+    module._addParam(new module.ParamAudio(module, t$))
 
     /**
      * on is called manually or by the Voice to engage the ADSR action (attack, decay,

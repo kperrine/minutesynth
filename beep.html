@@ -9,7 +9,7 @@ function init() {
     msInstance = new MinuteSynth()
 }
 
-function play(voiceName) {
+function play() {
     // The audio output will only work after a user interaction event.
     if (!msInstance) {
         init()
