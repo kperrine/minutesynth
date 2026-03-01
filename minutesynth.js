@@ -641,21 +641,24 @@ class MinuteSynth {
   }
 
   /**
+   * BaseC (Constant) type that can be extended for other modules below
+   */
+  BaseC = class C extends this.SynthModule {
+    z = this.minuteSynth.ac.createConstantSource()
+    constructor(v = 0) {
+      super()
+      this._addParam(new this.ParamValue('v', this.z.offset, v))
+      this.z.start()
+    }
+  }
+
+  /**
    * C (Constant) provides a steady value that can also be manipulated through the 'v' Param.
    * @param {number | SynthModule | [] | undefined} v - The initial value of the constant (default: 0).
    * @return {SynthModule} An instance of a constant source module.
    */
   C(v = 0) {
-    const Module = class C extends this.SynthModule {
-      z = this.minuteSynth.ac.createConstantSource()
-
-      constructor() {
-        super()
-        this._addParam(new this.ParamValue('v', this.z.offset, v))
-        this.z.start()
-      }
-    }
-    return new Module()
+    return new this.BaseC(v)
   }
 
   /**
@@ -683,55 +686,58 @@ class MinuteSynth {
    * @returns {SynthModule} An instance of an ADSR module.
    */
   ADSR(adsr = {}, t$) {
-    // TODO: Try to extend a class for more conciseness and consistency with other modules
-    const module = this.C()
-    module.a = { ...MinuteSynth.DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
-    module._offState = true
-    module._newState = true
+    const Module = class ADSR extends this.BaseC {
+      a = { ...MinuteSynth.DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
+      #offState = true
+      #newState = true
 
-    /**
-     * on is called manually or by the Voice to engage the ADSR action (attack, decay,
-     * sustain).
-     * @param {number} onTime - The time at which to start the ADSR action.
-     * @param {number} freq - Ununsed
-     */
-    module.on = function(onTime, freq) {
-      // TODO: Allow onTime to be 0 for immediate action
-      if (module._newState) {
-        module.v.vT(module.a.b, onTime)
-        module._newState = false
+      constructor() {
+        super()
+        this.v.vC(this.a.b) // Start at the base value
+        this._addParam(new this.ParamAudio(this, t$))
       }
-      else {
-        module.v.c(onTime + module.a.D)
+
+      /**
+       * on is called manually or by the Voice to engage the ADSR action (attack, decay,
+       * sustain).
+       * @param {number} onTime - The time at which to start the ADSR action.
+       * @param {number} freq - Ununsed
+       */
+      on(onTime, freq) {
+        // TODO: Allow onTime to be 0 for immediate action
+        if (this.#newState) {
+          this.v.vT(this.a.b, onTime)
+          this.#newState = false
+        }
+        else {
+          this.v.c(onTime + this.a.D)
+        }
+        this.v.t(this.a.e, onTime + this.a.D, this.a.a / 3)
+        this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
+        this.#offState = false
+        if (this.a.p) {
+          this.off(onTime + this.a.p)
+        }
       }
-      module.v.t(module.a.e, onTime + module.a.D, module.a.a / 3)
-      module.v.t(module.a.s, onTime + module.a.D + module.a.a, module.a.d / 3)
-      module._offState = false
-      if (module.a.p) {
-        module.off(onTime + module.a.p)
+
+      /** 
+       * triggerOff will cause the ADSR action to conclude (release).
+       * @param {number} offTime - The time at which to start the release action.
+       */
+      off(offTime) {
+        // TODO: Allow offTime to be 0 for immediate action
+        if (this.#offState) {
+          this.v.vT(this.a.b, offTime)
+        }
+        else {
+          this.v.c(offTime) // if note duration is shorter than A + D.
+          this.v.t(this.a.b, offTime, this.a.r / 3)
+          //Z.v.vT(Z.a.b, offTime + Z.a.r + 6) // Force zero because t doesn't get there.
+          this.#offState = true
+        }
       }
     }
-
-    /** 
-     * triggerOff will cause the ADSR action to conclude (release).
-     * @param {number} offTime - The time at which to start the release action.
-     */
-    module.off = function(offTime) {
-      // TODO: Allow offTime to be 0 for immediate action
-      if (module._offState) {
-        module.v.vT(module.a.b, offTime)
-      }
-      else {
-        module.v.c(offTime) // if note duration is shorter than A + D.
-        module.v.t(module.a.b, offTime, module.a.r / 3)
-        //Z.v.vT(Z.a.b, offTime + Z.a.r + 6) // Force zero because t doesn't get there.
-        module._offState = true
-      }
-    }
-
-    // Need to do this after on() method was called in case t$ is used to trigger.
-    module._addParam(new module.ParamAudio(module, t$))
-    return module
+    return new Module()
   }
 
   /**
@@ -787,28 +793,31 @@ class MinuteSynth {
    * @returns {SynthModule} An instance of a frequency control module
    */
   Freq({ p = 0, t$ } = {}) {
-    // TODO: Try to extend a class for more conciseness and consistency with other modules
-    const module = this.C()
-    module.p = p
-    module._prevFreq = 0
+    const Module = class Freq extends this.BaseC {
+      p = p
+      #prevFreq = 0
 
-    /** 
-     * on() is called manually or by the Voice to set the next frequency.
-     */
-    module.on = (onTime, freq) => {
-      // TODO: Can we use setTarget with 0 time constant?
-      if (module._prevFreq && module.p) {
-        module.v.t(freq, onTime, module.p / 3)
+      constructor() {
+        super()
+        // Allow for triggering via a similar mechanism as used for connecting audio:
+        this._addParam(new this.ParamAudio(this, t$))
       }
-      else {
-        module.v.vT(freq, onTime)
+
+      /** 
+       * on() is called manually or by the Voice to set the next frequency.
+       */
+      on(onTime, freq) {
+        // TODO: Can we use setTarget with 0 time constant?
+        if (this.#prevFreq && this.p) {
+          this.v.t(freq, onTime, this.p / 3)
+        }
+        else {
+          this.v.vT(freq, onTime)
+        }
+        this.#prevFreq = freq
       }
-      module._prevFreq = freq
     }
-
-    // Allow for triggering via a similar mechanism as used for connecting audio:
-    module._addParam(new module.ParamAudio(module, t$))
-    return module
+    return new Module()
   }
 
   /**
@@ -843,63 +852,66 @@ class MinuteSynth {
    * @returns {SynthModule} An instance of a voice module
    */
   Voice({ g = 0.5, v = true, p, r$ } = {}) {
-    // TODO: Try to extend the class for more conciseness and consistency with other modules
     // TODO: Allow inputs to be registrants
-    const module = this.Gain({ g, r$ })
-    module._modules = [] // Modules registered to receive on/off triggers
-    module.f = this.Freq({p}) // Frequency control module. Set it by calling on().
+    const Module = class Voice extends this.BaseAmp {
+      #modules = [] // Modules registered to receive on/off triggers
+      f = this.minuteSynth.Freq({p}) // Frequency control module. Set it by calling on().
 
-    /**
-     * _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
-     * connection. Return a nonzero to automatically remove values from input.
-     */
-    module.super_$ = module._$
-    module._$ = (targetObj) => {
-      if (targetObj.on) {
-        module.rg(targetObj)
-        return 0
+      constructor() {
+        super(g)
+        this._addParam(new this.ParamAudio(this.z, r$))
+        this._$(this.f) // Attach frequency control to the voice
+        v && this.$(this.minuteSynth.ac.destination) // Attach voice to destination if v is true
       }
-      else {
-        return module.super_$(targetObj)
+
+      /**
+       * _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
+       * connection. Return a nonzero to automatically remove values from input.
+       */
+      _$(targetObj) {
+        if (targetObj.on) {
+          this.rg(targetObj)
+          return 0
+        }
+        else {
+          return super._$(targetObj)
+        }
+      }
+
+      /**
+       * rg() allows a module to be registered with this voice to receive trigger events.
+       * The preferred way is to attach Voice to registered modules with .$()
+       */
+      // TODO: Singular "passthrough" register that returns the same object. Or return if single item.
+      rg(...modules) {
+        this.#modules.push.apply(this.#modules, modules)
+        return modules[0]
+      }
+
+      /**
+       * Removes Modules from the Voice's triggering control.
+       */
+      drg(...modules) {
+        modules.forEach(module => this.#modules.splice(this.#modules.indexOf(module), 1))
+      }
+
+      /**
+       * This will call on() for all Modules registered.
+       */
+      on(onTime, freq) {
+        !onTime && (onTime = this.minuteSynth.now())
+        this.#modules.forEach(module => module.on && module.on(onTime, freq))
+      }
+
+      /**
+       * This will call off() for all Modules registered.
+       */
+      off(offTime) {
+        !offTime && (offTime = this.minuteSynth.now())
+        this.#modules.forEach(module => module.off && module.off(offTime))
       }
     }
-
-    /**
-     * rg() allows a module to be registered with this voice to receive trigger events.
-     * The preferred way is to attach Voice to registered modules with .$()
-     */
-    // TODO: Singular "passthrough" register that returns the same object. Or return if single item.
-    module.rg = (...modules) =>{
-      module._modules.push.apply(module._modules, modules)
-      return modules[0]
-    }
-
-    /**
-     * Removes Modules from the Voice's triggering control.
-     */
-    module.drg = (...modules) => {
-      modules.forEach(module => module._modules.splice(module._modules.indexOf(module), 1))
-    }
-
-    /**
-     * This will call on() for all Modules registered.
-     */
-    module.on = (onTime, freq) => {
-      !onTime && (onTime = this.now())
-      module._modules.forEach(module => module.on && module.on(onTime, freq))
-    }
-
-    /**
-     * This will call off() for all Modules registered.
-     */
-    module.off = (offTime) => {
-      !offTime && (offTime = this.now())
-      module._modules.forEach(module => module.off && module.off(offTime))
-    }
-
-    module._$(module.f) // Attach frequency control to the voice
-    v && module.$(this.ac.destination) // Attach voice to destination if v is true
-    return module
+    return new Module()
   }
 
   /**
