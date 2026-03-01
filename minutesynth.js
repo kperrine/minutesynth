@@ -25,7 +25,7 @@ class MinuteSynth {
     }
   }
 
-  static _DEFAULT_ADSR = new MinuteSynth.ADSRParams()
+  static DEFAULT_ADSR = new MinuteSynth.ADSRParams()
 
   /**
    * Sample rate that is provided by the AudioContext. By default, it is 44100 Hz.
@@ -39,7 +39,7 @@ class MinuteSynth {
    * @type {AudioContext}
    * @readonly
    */
-  audioContext
+  ac
 
   /**
    * Length of noise sample in seconds. Equates to seconds * sampleRate samples.
@@ -52,7 +52,7 @@ class MinuteSynth {
    * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
    */
   constructor(ac = new ACX()) {
-    this.audioContext = ac
+    this.ac = ac
     this.sampleRate = ac.sampleRate
   }
 
@@ -71,23 +71,18 @@ class MinuteSynth {
      * collection of parameters for this module
      * @type {Object.<string, Param>}
      */
-    _params
+    _params = {}
 
     /**
      * outParams is a list of parameters that this module is attached to
      * @type {Param[]}
      */
-    _outParams
-
-    constructor() {
-      this._params = {}
-      this._outParams = []
-    }
+    #outParams = []
 
     /** Represents a parameter that allows for attachment to another module or constant as input */
     Param = (parent => class Param {
       /** @type {SynthModule[]} */
-      _inModules
+      #inModules
 
       /** @type {SynthModule} */
       synthModule = parent
@@ -99,10 +94,10 @@ class MinuteSynth {
        * @param {number | string} defVal 
        */
       constructor(name, obj, defVal) {
-        this._name = name
+        this.name = name
         this._obj = obj
         this._defVal = defVal
-        this._inModules = []
+        this.#inModules = []
         // TODO: Call _addParam() from here because we have our SynthModule reference.
       }
 
@@ -117,7 +112,7 @@ class MinuteSynth {
           if (!isNaN(module)) {
             module = this.synthModule.minuteSynth.C(module)
           }
-          this._inModules.push(module)
+          this.#inModules.push(module)
           if (module._$(this._obj)) {
             this.z0 && this.z0()
           }
@@ -130,13 +125,13 @@ class MinuteSynth {
        * @param {SynthModule | undefined} inModule 
        */
       detach(inModule) {
-        for (let module of [...this._inModules]) { // Iterate over copy
+        for (let module of [...this.#inModules]) { // Iterate over copy
           if (!inModule || (module === inModule)) {
             [].concat(this._obj).forEach(obj => {
               try {
                 module.z.disconnect(obj)
               } catch (_) {}})
-            inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
+            inModule && this.#inModules.splice(this.#inModules.indexOf(inModule), 1)
           }
         }
       }
@@ -261,7 +256,7 @@ class MinuteSynth {
         param = tgtThing._params[tgtParamName || 'in']
       }
       param.r$(this)
-      this._outParams.push(param)
+      this.#outParams.push(param)
       return tgtThing // Allows chaining of commands
     }
 
@@ -300,11 +295,11 @@ class MinuteSynth {
      * @param {string | null | undefined} paramName 
      */
     detach(tgtModule, paramName) {
-      for (let param of [...this._outParams]) {
+      for (let param of [...this.#outParams]) {
         if (!tgtModule || (param.synthModule === tgtModule)) {
-          if (!paramName || (param._name === paramName)) {
+          if (!paramName || (param.name === paramName)) {
             param.detach(this)
-            this._outParams.splice(this._outParams.indexOf(param), 1)
+            this.#outParams.splice(this.#outParams.indexOf(param), 1)
           }
         }
       }
@@ -316,16 +311,23 @@ class MinuteSynth {
      * @return {Param} The parameter that was added, to allow for chaining
      */
     // TODO: Investigate whether we can call this from Param constructor...
+    // Can pass in _defVal as well to avoid storing along with the object.
     _addParam(param) {
-      this._params[param._name] = param
-      this[param._name] = param
+      this._params[param.name] = param
+      this[param.name] = param
       if (!isNaN(param._defVal)) {
-        // Assign number:
+        // If a singular plain number was given, set value natively here:
         param.vC(param._defVal)
       }
       else if (param._defVal) {
         // Assign module(s):
-        [].concat(param._defVal).forEach(element => element.$(param))
+        [].concat(param._defVal).forEach(element => {
+          if (!isNaN(element)) {
+            // If a plain number was given in an array, then wrap it in a "C" module:
+            element = this.minuteSynth.C(element)
+          }
+          element.$(param)
+        })
       }
       return param
     }
@@ -361,7 +363,7 @@ class MinuteSynth {
      */
     constructor(gainVal = 1) {
       super()
-      this.z = this.minuteSynth.audioContext.createGain()
+      this.z = this.minuteSynth.ac.createGain()
       this._addParam(new this.ParamValue('g', this.z.gain, gainVal))
     }
   }
@@ -369,7 +371,7 @@ class MinuteSynth {
   /**
    * Convenience/clarity constants for Osc t: type
    */
-  WaveType = Object.freeze({
+  Waveforms = Object.freeze({
     SINE: 1,
     SQUARE: 2,
     SAWTOOTH: 3,
@@ -381,7 +383,7 @@ class MinuteSynth {
    * Osc (Oscillaor) is a simple tone generator. Specify its type and also
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
-   * @param {number | string} t - Type of waveform, can use WaveType lookup
+   * @param {number | string} t - Type of waveform, can use Waveforms lookup
    * @param {number | undefined} S - scale (default: 1)
    * @param {number | SynthModule | []} f - default frequency
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
@@ -394,7 +396,7 @@ class MinuteSynth {
    */
   Osc({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
     const Module = class Osc extends this.BaseAmp {
-      o = this.minuteSynth.audioContext.createOscillator()
+      o = this.minuteSynth.ac.createOscillator()
       _calcSCRate = freq => freq * S / n
 
       constructor() {
@@ -403,7 +405,7 @@ class MinuteSynth {
           this.o.type = isNaN(t) ? t : ['sine', 'square', 'sawtooth', 'triangle', 'custom'][t - 1]
         }
         if (r) {
-          this.o.setPeriodicWave(this.minuteSynth.audioContext.createPeriodicWave(r, i))
+          this.o.setPeriodicWave(this.minuteSynth.ac.createPeriodicWave(r, i))
         }
         this._addParam(new this.ParamStart(this.o, s))
         this._addParam(new this.ParamValue('d', this.o.detune, d))
@@ -428,10 +430,10 @@ class MinuteSynth {
    * @param {number | SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
    * @returns {SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0 }) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.ac.sampleRate, r = 1, d, n = 0 }) {
     const Module = class Buf extends this.BaseAmp {
-      b = this.minuteSynth.audioContext.createBuffer(c, ~~(F * T), F)
-      B = this.minuteSynth.audioContext.createBufferSource()
+      b = this.minuteSynth.ac.createBuffer(c, ~~(F * T), F)
+      B = this.minuteSynth.ac.createBufferSource()
       T = T
       F = F
       N = ~~(F * T)
@@ -503,7 +505,7 @@ class MinuteSynth {
    */
   Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
-    const module = this.Buf({ T: W / this.audioContext.sampleRate, S, f, g, s, n: 1 })
+    const module = this.Buf({ T: W / this.ac.sampleRate, S, f, g, s, n: 1 })
     const data = module.mem()
     const bias = 0.5 - w
     for (let i in data) {
@@ -524,7 +526,7 @@ class MinuteSynth {
   Dist({ a = 50, F = () => this.dw(a), g = 1, r$ }) {
     // TODO: Input param: y?
     const module = class Dist extends this.BaseAmp {
-      w = this.minuteSynth.audioContext.createWaveShaper()
+      w = this.minuteSynth.ac.createWaveShaper()
       constructor() {
         super(g)
         this.w.curve = F()
@@ -539,7 +541,7 @@ class MinuteSynth {
   /**
    * Convenience/clarity constants for Filt t: type
    */
-  FilterType = Object.freeze({
+  Filters = Object.freeze({
     LOWPASS: 1,
     HIGHPASS: 2,
     BANDPASS: 3,
@@ -552,7 +554,7 @@ class MinuteSynth {
 
   /**
    * Filt (Filter) allows for filtering of sound using the filter type provided in t.
-   * @param {number | string} t - Type of filter, can use FilterType lookup
+   * @param {number | string} t - Type of filter, can use Filters lookup
    * @param {number | SynthModule | []} q - Q value
    * @param {number | SynthModule | []} f - frequency
    * @param {number | undefined} S - scale (default: 1)
@@ -563,7 +565,7 @@ class MinuteSynth {
    */
   Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
     const module = class Filt extends this.BaseAmp {
-      q = this.minuteSynth.audioContext.createBiquadFilter()
+      q = this.minuteSynth.ac.createBiquadFilter()
       _calcSCRate = freq => freq * S
       constructor() {
         super(g)
@@ -589,7 +591,7 @@ class MinuteSynth {
    */
   Conv({ b, g = 1, n = true, r$ }) {
     const Module = class Conv extends this.BaseAmp {
-      c = this.minuteSynth.audioContext.createConvolver()
+      c = this.minuteSynth.ac.createConvolver()
       b = b
 
       constructor() {
@@ -616,7 +618,7 @@ class MinuteSynth {
    */
   Comp ({ t, k, o, a, r, g=1, r$ }={}) {
     const module = class Comp extends this.BaseAmp {
-      R = this.minuteSynth.audioContext.createDynamicsCompressor()
+      R = this.minuteSynth.ac.createDynamicsCompressor()
       constructor() {
         super(g)
         this._addParam(new this.ParamAudio(this.R, r$))
@@ -638,7 +640,7 @@ class MinuteSynth {
    */
   C(v = 0) {
     const Module = class C extends this.SynthModule {
-      z = this.minuteSynth.audioContext.createConstantSource()
+      z = this.minuteSynth.ac.createConstantSource()
 
       constructor() {
         super()
@@ -669,14 +671,14 @@ class MinuteSynth {
    * ADSR (Attack, Decay, Sustain, Release) uses ADSR parameters to create a module that
    * can allow values to ramp up and down whenever the module is triggered. Use the t$ 
    * (second parameter) to reverse-bind a trigger.
-   * @param {MinuteSynth.ADSRParams | object | undefined} adsr - The ADSR parameters to use for this module (default: this._DEFAULT_ADSR).
+   * @param {MinuteSynth.ADSRParams | object | undefined} adsr - The ADSR parameters to use for this module (default: DEFAULT_ADSR).
    * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
    * @returns {SynthModule} An instance of an ADSR module.
    */
   ADSR(adsr = {}, t$) {
     // TODO: Try to extend a class for more conciseness and consistency with other modules
     const module = this.C()
-    module.a = { ...MinuteSynth._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
+    module.a = { ...MinuteSynth.DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
     module._offState = true
     module._newState = true
 
@@ -756,16 +758,16 @@ class MinuteSynth {
    * @param {number | undefined} S - scale (default: sample rate / R)
    * @returns {SynthModule} An instance of a spectrum module
    */
-  Spec({ F, G, n = 440, R = this.audioContext.sampleRate / 4, f, s = 0, g = 1, S = 1 }) {
+  Spec({ F, G, n = 440, R = this.ac.sampleRate / 4, f, s = 0, g = 1, S = 1 }) {
     const real = new Array(R).fill(0)
     const imag = [...real]
     for (let i in F) {
-      let j = ~~(F[i] * R / this.audioContext.sampleRate)
+      let j = ~~(F[i] * R / this.ac.sampleRate)
       if (j < R) {
         real[j] = G ? G[i] : 1
       }
     }
-    const module = this.Osc({ r: real, i: imag, f, s, g, S: this.audioContext.sampleRate / R * S, n })
+    const module = this.Osc({ r: real, i: imag, f, s, g, S: this.ac.sampleRate / R * S, n })
     return module
   }
 
@@ -825,7 +827,7 @@ class MinuteSynth {
   /**
    * Voice represents a single channel of sound that is controlled by one main frequency.
    * The gain g is the final "volume control" and its output is the AudioContext's destination.
-   * Set v to zero to disable attaching to this.audioContext.destination. You can
+   * Set v to zero to disable attaching to this.ac.destination. You can
    * get final WebAudio from .z. An automatically generated frequency controller is available at .f.
    * @param {number | SynthModule | []  | undefined} g - Gain (default: 0.5)
    * @param {boolean | undefined} v - Set to true to automatically connect to default destination (default: true)
@@ -889,7 +891,7 @@ class MinuteSynth {
     }
 
     module._$(module.f) // Attach frequency control to the voice
-    v && module.$(this.audioContext.destination) // Attach voice to destination if v is true
+    v && module.$(this.ac.destination) // Attach voice to destination if v is true
     return module
   }
 
@@ -898,7 +900,7 @@ class MinuteSynth {
    * @returns {number} The current time of the AudioContext in seconds.
    */
   now() {
-    return this.audioContext.currentTime
+    return this.ac.currentTime
   }
 
   // -- Support functions: --
@@ -915,8 +917,8 @@ class MinuteSynth {
   reverb(fadeInTime, decayTime, subsample, numChan = 2) {
     // params.decayTime is the -60dB fade time. We let it go 50% longer to get to -90dB.
     const totalTime = decayTime * 1.5
-    const decaySampleFrames = ~~(decayTime * this.audioContext.sampleRate)
-    const fadeInSampleFrames = ~~(fadeInTime * this.audioContext.sampleRate)
+    const decaySampleFrames = ~~(decayTime * this.ac.sampleRate)
+    const fadeInSampleFrames = ~~(fadeInTime * this.ac.sampleRate)
     // 60dB is a factor of 1 million in power, or 1000 in amplitude.
     const decayBase = 1e-3 ** (1 / decaySampleFrames)
     const reverbIR = this.Buf({ c: numChan, T: totalTime })

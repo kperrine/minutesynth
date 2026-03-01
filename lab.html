@@ -121,7 +121,7 @@ const MAPPING = {cN: 0, cS: 1, dN: 2, dS: 3, eN: 4, fN: 5, fS: 6,
 let currentID = ""
 let activeID = ""
 let synthInst
-let analyser
+let analyzer
 let keyVoice
 let codeCache = ""
 
@@ -152,7 +152,7 @@ function checkKeyVoice() {
     let flag = false;
     if (keyVoice) {
         if (!(keyVoice.on && keyVoice.off && keyVoice.z)) {
-            console.log("ERROR: The code block is not returning a M$.Voice module.")
+            console.log("ERROR: The code block is not returning a m$.Voice module.")
             flag = true;
             clearKeyVoice()
         }
@@ -162,7 +162,7 @@ function checkKeyVoice() {
         flag = true
     }
     if (flag) {
-        alert("The code block doesn't return a M$.Voice module.")
+        alert("The code block doesn't return a m$.Voice module.")
     }
 }
 
@@ -188,13 +188,13 @@ function playKey(offset) {
     if (!synthInst) {
         synthInit()
     }
-    if (synthInst.audioContext.state === "suspended") {
-        synthInst.audioContext.resume()
+    if (synthInst.ac.state === "suspended") {
+        synthInst.ac.resume()
     }
     if (!keyVoice) {
         createKeyVoice()
         if (keyVoice) {
-            keyVoice.$(analyser)
+            keyVoice.$(analyzer)
         }
     }
     if (keyVoice) {
@@ -310,7 +310,7 @@ function showRecording() {
 function prepVoiceFunc(snippet) {
     let voiceFunc
     try {
-        voiceFunc = new Function('M$', snippet)
+        voiceFunc = new Function('m$', snippet)
     }
     catch (exc) {
         console.log("ERROR: Function parsing: " + exc)
@@ -356,10 +356,10 @@ function init() {
 
 function synthInit() {
     synthInst = new MinuteSynth();
-    analyser = synthInst.audioContext.createAnalyser();
-    analyser.minDecibels = -90;
-    analyser.maxDecibels = -10;
-    analyser.smoothingTimeConstant = 0.65;
+    analyzer = synthInst.ac.createAnalyser();
+    analyzer.minDecibels = -90;
+    analyzer.maxDecibels = -10;
+    analyzer.smoothingTimeConstant = 0.65;
 
     let canvas = document.querySelector('.visualizer');
     let canvasCtx = canvas.getContext("2d");
@@ -370,8 +370,8 @@ function synthInit() {
         const WIDTH = canvas.width
         const HEIGHT = canvas.height
 
-        analyser.fftSize = 256
-        const bufferLength = analyser.frequencyBinCount
+        analyzer.fftSize = 256
+        const bufferLength = analyzer.frequencyBinCount
         let dataArray = new Uint8Array(bufferLength)
 
         canvasCtx.clearRect(0, 0, WIDTH, HEIGHT)
@@ -379,7 +379,7 @@ function synthInit() {
         let draw = function() {
             var drawVisual = requestAnimationFrame(draw)
 
-            analyser.getByteFrequencyData(dataArray)
+            analyzer.getByteFrequencyData(dataArray)
 
             canvasCtx.fillStyle = 'rgb(0, 0, 0)'
             canvasCtx.fillRect(0, 0, WIDTH, HEIGHT)
@@ -405,14 +405,14 @@ function synthInit() {
         const HEIGHT = canvas.height;
         const SAMP_SIZE = 240;
 
-        analyser.fftSize = 2048;
-        const bufferLength = analyser.frequencyBinCount;
+        analyzer.fftSize = 2048;
+        const bufferLength = analyzer.frequencyBinCount;
         let dataArray = new Uint8Array(bufferLength);
 
         let draw = function() {
             requestAnimationFrame(draw);
 
-            analyser.getByteTimeDomainData(dataArray);
+            analyzer.getByteTimeDomainData(dataArray);
 
             canvasCtx.fillStyle = "rgb(200, 200, 200)";
             canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
@@ -532,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="wrapper">
         <canvas class="visualizer" width="640" height="100"></canvas>
         <div>
-        Write a synth definition. Variable M$ is the MinuteSynth object, and code must return a M$.Voice module.<br>
+        Write a synth definition. Variable m$ is the MinuteSynth object, and code must return a m$.Voice module.<br>
         <textarea id="snippet" rows="16" cols="120">
         </textarea>
     <div>

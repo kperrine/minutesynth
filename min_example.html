@@ -4,23 +4,23 @@
     <script src="minutesynth.js"></script>
     <script src="support/tonedef.js"></script>
     <script>
-var msInstance
+var m$
 
 function init() {
-    msInstance = new MinuteSynth()
+    m$ = new MinuteSynth()
 }
 
 function play(voiceName) {
     // The audio output will only work after a user interaction event.
-    if (!msInstance) {
+    if (!m$) {
         init()
     }
 
     // Get a MinuteSynth network referenced from a Voice object:
-    const voice = ToneDefs.basicADSR.fn(msInstance)
+    const voice = ToneDefs.basicADSR.fn(m$)
 
     // Activate 440 Hz for 3 seconds:
-    const now = msInstance.now()
+    const now = m$.now()
     voice.on(now, 440)
     voice.off(now + 3)
 }
