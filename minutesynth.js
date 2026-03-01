@@ -339,20 +339,20 @@ class MinuteSynth {
      */
     _addFreqHelper(control, defFreq = 0) {
       control.value = 0
-      this._S = this.minuteSynth.Gain()
+      const gainModule = this.minuteSynth.Gain()
       if (!isNaN(defFreq)) {
         // If the default value is a number, then create a constant for it:
-        this._C = this.minuteSynth.C(defFreq)
+        const freqC = this.minuteSynth.C(defFreq)
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(new this.ParamValue('f', this._C.z.offset, defFreq))
-        this._C.$(this._S)
+        this._addParam(new this.ParamValue('f', freqC.z.offset, defFreq))
+        freqC.$(gainModule)
       }
       else {
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(new this.ParamValue('f', this._S.z, defFreq))
+        this._addParam(new this.ParamValue('f', gainModule.z, defFreq))
       }
-      this._addParam(new this.ParamValue('S', this._S.z.gain, this._calcSCRate(1)))
-      this._S.z.connect(control)
+      this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate(1)))
+      gainModule.z.connect(control)
     }
   })(this)
 
@@ -361,6 +361,13 @@ class MinuteSynth {
      * Establishes a base module with a gain node for controlling output level (default unity gain)
      * @param {number | undefined} gainVal - Default gain, including negative values to flip the waveform
      */
+
+    /**
+     * Calculates the scale-control rate for frequency-based modules
+     * @type {function(number): number}
+     */
+    _calcSCRate
+
     constructor(gainVal = 1) {
       super()
       this.z = this.minuteSynth.ac.createGain()
