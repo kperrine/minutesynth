@@ -141,8 +141,8 @@ function showError(exc) {
 }
 
 function clearKeyVoice() {
-    if (keyVoice && keyVoice.del) {
-        keyVoice.del()
+    if (keyVoice && keyVoice.detach) {
+        keyVoice.detach()
     }
     releaseAction()
     keyVoice = undefined
@@ -188,13 +188,13 @@ function playKey(offset) {
     if (!synthInst) {
         synthInit()
     }
-    if (synthInst.ac.state === "suspended") {
-        synthInst.ac.resume()
+    if (synthInst.audioContext.state === "suspended") {
+        synthInst.audioContext.resume()
     }
     if (!keyVoice) {
         createKeyVoice()
         if (keyVoice) {
-            keyVoice.z.connect(analyser)
+            keyVoice.$(analyser)
         }
     }
     if (keyVoice) {
@@ -355,8 +355,8 @@ function init() {
 }
 
 function synthInit() {
-    synthInst = MinuteSynth();
-    analyser = synthInst.ac.createAnalyser();
+    synthInst = new MinuteSynth();
+    analyser = synthInst.audioContext.createAnalyser();
     analyser.minDecibels = -90;
     analyser.maxDecibels = -10;
     analyser.smoothingTimeConstant = 0.65;

@@ -132,7 +132,10 @@ class MinuteSynth {
       detach(inModule) {
         for (let module of [...this._inModules]) { // Iterate over copy
           if (!inModule || (module === inModule)) {
-            [].concat(this._obj).forEach(obj => module.z.disconnect(obj))
+            [].concat(this._obj).forEach(obj => {
+              try {
+                module.z.disconnect(obj)
+              } catch (_) {}})
             inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
           }
         }
@@ -234,7 +237,7 @@ class MinuteSynth {
        */
       stop(stopTime = 0) {
         this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
-        // TODO: Consider scheduling an object kill() at stopTime
+        // TODO: Consider scheduling an object detach() at stopTime
       }
     }
 
@@ -249,6 +252,9 @@ class MinuteSynth {
       // TODO: Add option to inherit parameters from target, if target is a module. Don't copy "in", and
       // if param exists in this, add index to it, e.g. "g2". That would allow for easier manipulation
       // of params from one location.
+      if (tgtThing instanceof AudioNode) {
+        tgtThing = this.minuteSynth.ACN(tgtThing)
+      }
       // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
       let param = tgtThing
       if (tgtThing._params) {
@@ -281,7 +287,9 @@ class MinuteSynth {
      * @param {AudioNode} targetObj
      */
     _$(targetObj) {
-      this.z.connect(targetObj)
+      try {
+        this.z.connect(targetObj)
+      } catch (_) {}
       return 1
     }
 
@@ -300,13 +308,6 @@ class MinuteSynth {
           }
         }
       }
-    }
-
-    /**
-     * Removes all connections to and from this module.
-     */
-    kill() {
-      this.detach()
     }
 
     /**
@@ -368,7 +369,7 @@ class MinuteSynth {
   /**
    * Convenience/clarity constants for Osc t: type
    */
-  static WaveType = Object.freeze({
+  WaveType = Object.freeze({
     SINE: 1,
     SQUARE: 2,
     SAWTOOTH: 3,
@@ -427,7 +428,7 @@ class MinuteSynth {
    * @param {number | SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
    * @returns {SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.minuteSynth.audioContext.sampleRate, r = 1, d, n = 0 }) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.audioContext.sampleRate, r = 1, d, n = 0 }) {
     const Module = class Buf extends this.BaseAmp {
       b = this.minuteSynth.audioContext.createBuffer(c, ~~(F * T), F)
       B = this.minuteSynth.audioContext.createBufferSource()
@@ -502,7 +503,7 @@ class MinuteSynth {
    */
   Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
-    const module = this.Buf({ T: W / this.minuteSynth.audioContext.sampleRate, S, f, g, s, n: 1 })
+    const module = this.Buf({ T: W / this.audioContext.sampleRate, S, f, g, s, n: 1 })
     const data = module.mem()
     const bias = 0.5 - w
     for (let i in data) {
@@ -538,7 +539,7 @@ class MinuteSynth {
   /**
    * Convenience/clarity constants for Filt t: type
    */
-  static FilterType = Object.freeze({
+  FilterType = Object.freeze({
     LOWPASS: 1,
     HIGHPASS: 2,
     BANDPASS: 3,
@@ -678,7 +679,6 @@ class MinuteSynth {
     module.a = { ...MinuteSynth._DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
     module._offState = true
     module._newState = true
-    module._addParam(new module.ParamAudio(module, t$))
 
     /**
      * on is called manually or by the Voice to engage the ADSR action (attack, decay,
@@ -719,6 +719,9 @@ class MinuteSynth {
         module._offState = true
       }
     }
+
+    // Need to do this after on() method was called in case t$ is used to trigger.
+    module._addParam(new module.ParamAudio(module, t$))
     return module
   }
 
@@ -753,16 +756,16 @@ class MinuteSynth {
    * @param {number | undefined} S - scale (default: sample rate / R)
    * @returns {SynthModule} An instance of a spectrum module
    */
-  Spec({ F, G, n = 440, R = this.minuteSynth.audioContext.sampleRate / 4, f, s = 0, g = 1, S = 1 }) {
+  Spec({ F, G, n = 440, R = this.audioContext.sampleRate / 4, f, s = 0, g = 1, S = 1 }) {
     const real = new Array(R).fill(0)
     const imag = [...real]
     for (let i in F) {
-      let j = ~~(F[i] * R / this.minuteSynth.audioContext.sampleRate)
+      let j = ~~(F[i] * R / this.audioContext.sampleRate)
       if (j < R) {
         real[j] = G ? G[i] : 1
       }
     }
-    const module = this.Osc({ r: real, i: imag, f, s, g, S: this.minuteSynth.audioContext.sampleRate / R * S, n })
+    const module = this.Osc({ r: real, i: imag, f, s, g, S: this.audioContext.sampleRate / R * S, n })
     return module
   }
 
@@ -800,12 +803,32 @@ class MinuteSynth {
   }
 
   /**
+   * ACN is a wrapper for an arbitrary AudioContext node, to facilitate connection
+   * tracking and parameter manipulation offered through this framework.
+   * @param {AudioNode} N - The destination AudioNode to connect to
+   * @param {number | SynthModule | [] | undefined} r$ - Optional input to be connected to the destination parameter.
+   * @returns {SynthModule} An instance of a destination module
+   */
+  // TODO: Add the ability to add in arbitrary parameters via object
+  ACN(N, r$) {
+    const Module = class ACN extends this.SynthModule {
+      z = N
+
+      constructor() {
+        super()
+        this._addParam(new this.ParamAudio(this.z, r$))
+      }
+    }
+    return new Module()
+  }
+
+  /**
    * Voice represents a single channel of sound that is controlled by one main frequency.
    * The gain g is the final "volume control" and its output is the AudioContext's destination.
-   * Set v to zero to disable attaching to this.minuteSynth.audioContext.destination. You can
+   * Set v to zero to disable attaching to this.audioContext.destination. You can
    * get final WebAudio from .z. An automatically generated frequency controller is available at .f.
    * @param {number | SynthModule | []  | undefined} g - Gain (default: 0.5)
-   * @param {boolean | undefined} v - Whether to connect the voice to the AudioContext destination (default: true)
+   * @param {boolean | undefined} v - Set to true to automatically connect to default destination (default: true)
    * @param {number | SynthModule | [] | undefined} p - default frequency
    * @param {number | SynthModule | [] | undefined} r$ - reverse-attach input for frequency control
    * @returns {SynthModule} An instance of a voice module
@@ -821,9 +844,15 @@ class MinuteSynth {
      * _$ is "internal attach" that is used to facilitate underlying output AudioNode to parameter
      * connection. Return a nonzero to automatically remove values from input.
      */
+    module.super_$ = module._$
     module._$ = (targetObj) => {
-      module.rg(targetObj)
-      return 0
+      if (targetObj.on) {
+        module.rg(targetObj)
+        return 0
+      }
+      else {
+        return module.super_$(targetObj)
+      }
     }
 
     /**
@@ -860,7 +889,7 @@ class MinuteSynth {
     }
 
     module._$(module.f) // Attach frequency control to the voice
-    v && module.z.connect(this.audioContext.destination) // Attach to destination
+    v && module.$(this.audioContext.destination) // Attach voice to destination if v is true
     return module
   }
 
