@@ -34,17 +34,18 @@ const ToneDefs = {
     fn: m$ => {
       // Demonstrates FM synthesis
       // Here, we'll make our modules but not hook them up yet:
-      const sinewave = m$.Osc({ t: m$.Waveforms.SINE }) // A sine wave
-      const squarewave = m$.Osc({ t: m$.Waveforms.SQUARE }) // A square wave
-      const voice = m$.Voice() // Output voice. Note that it has .f for frequency control.
-      const fourFifthFreq = m$.Gain({ g: 0.8, r$: voice.f }) // The output of this is freq x 0.8
-      const fadeOut = m$.ADSR({ p: 0.05, r: 1 }, voice) // Controls the tone on/off and fadeout
+      const sinewave = m$.Osc({ t: m$.Waveforms.SINE }) // An always-on sine wave
+      const squarewave = m$.Osc({ t: m$.Waveforms.SQUARE }) // An always-on square wave
+      const envelope = m$.ADSR({ p: 0.05, r: 1 }) // Will control tone emit and fadeout
       const multResult = m$.Gain() // Multiples tones together for FM
+      const voice = m$.Voice() // Output voice. Note that it has .f for frequency control.
 
       // Wire frequency controls and fade out controls:
       voice.f.$(sinewave.f) // Link voice frequency control to sine wave oscillator
+      voice.$(envelope) // Allows the voice on/off to trigger the ADSR
+      envelope.$(voice.g) // That then controls the voice's final gain
+      const fourFifthFreq = m$.Gain({ g: 0.98, r$: voice.f }) // Make detuned freq.
       fourFifthFreq.$(squarewave.f) // Control the square wave oscillator
-      fadeOut.$(squarewave.g) // Controls the square wave's gain, causing it to fade out
 
       // Now connect the audio routing of the modules:
       sinewave.$(multResult) // Connect sine wave to multiplier audio input
@@ -448,7 +449,7 @@ const ToneDefs = {
     fn: m$ => {
       // From Joe Sullivan: http://joesul.li/van/synthesizing-hi-hats/
       // NOTE: Currently does not respond to Voice frequency input.
-      let fundamental = 40,
+      let fundamental = 40, // (Change to 800 for clanging sound)
           ratios = [2, 3, 4.16, 5.43, 6.79, 8.21],
           bandFilter = m$.Filt({ t: m$.Filters.BANDPASS, q: 1, f: 10000 }),
           hiFilter = m$.Filt({ t: m$.Filters.HIGHPASS, q: 1, f: 7000, r$: bandFilter })
@@ -491,38 +492,20 @@ const ToneDefs = {
     },
     off: 0.5
   },
-  kick: {
+  handDrum: {
     fn: m$ => {
-      // Note that this is rendered at a lower sample rate so that the end result is
-      // pitched up. Try it at 9000, too!
+      // Result of playing around. Can use more tweaking.
       // NOTE: Currently does not respond to Voice frequency input.
       let noise = m$.Noise(),
-          lfADSR = m$.ADSR({ b: 4000, a: 0.15, e: 10, d: 1, s: 370 }),
-          lowFilter = m$.Filt({ t: m$.Filters.LOWPASS, q: 0.3, f: lfADSR, g: 1, r$: noise }),
+          lfADSR = m$.ADSR({ b: 8000, a: 0.15, e: 5, d: 1, s: 400 }),
+          lowFilter = m$.Filt({ t: m$.Filters.LOWPASS, q: 1, f: lfADSR, g: 1, r$: noise }),
           outGain = m$.Gain({ r$: lowFilter }),
-          freqs = [50, 793, 990, 2685, 4672, 6941, 14609, 18526],
-          qs = [2, 7, 10, 5, 10, 20, 5, 5],
-          gains = [1, 0.5, 0.4, 0.3, 0.4, 0.5, 0.2, 0.1],
-          fADSR = m$.ADSR({ a: 0.7, e: 200 }),
+          fADSR = m$.ADSR({ a: 0.7, e: 100 }),
           aADSR0 = m$.ADSR({ d: 0.3, s: 0 }),
           aADSR = m$.ADSR({ d: 0.5, e: 0.2, s: 0.8 }),
-          i, filter
-      for (i = 0; i < freqs.length; i++) {
-          filter = m$.Filt({ t: m$.Filters.BANDPASS, q: qs[i], f: freqs[i], g: gains[i], r$: noise })
-          if (i == 0) {
-              m$.C(gains[i]).$(filter.g)
-              aADSR0.$(filter.g)
-          }
-          else if (i == 1 || i == 2 || i == 6) {
-              m$.C(freqs[i]).$(filter.f)
-              fADSR.$(filter.f)
-          }
-          else {
-              m$.C(gains[i]).$(filter.g)
-              aADSR.$(filter.g)
-          }
-          filter.$(outGain)
-      }
+          filter = m$.Filt({ t: m$.Filters.BANDPASS, q: 100, f: 25, r$: noise })
+      aADSR0.$(filter.g)
+      filter.$(outGain)
       let voice = m$.Voice({ g: 1, r$: outGain })
       voice.rg(fADSR, aADSR, aADSR0, lfADSR)
       let adsrMod = voice.rg(m$.ADSR({ a: 0.01, d: 0.6, s: 0 }))
