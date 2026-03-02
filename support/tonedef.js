@@ -33,13 +33,25 @@ const ToneDefs = {
   basicFM: {
     fn: m$ => {
       // Demonstrates FM synthesis
-      const voice = m$.Voice(),
-            sinewave = m$.Osc({ t: m$.Waveforms.SINE, f: voice.f }),
-            fourFifthFreq = m$.Gain({ g: 4/5, r$: voice.f }),
-            squareADSR = m$.ADSR({ p: 0.05, r: 1 }, voice), // Pulse
-            squarewave = m$.Osc({ t: m$.Waveforms.SQUARE, f: fourFifthFreq, g: squareADSR }),
-            multResult = m$.Gain({ g: sinewave, r$: squarewave })
-      multResult.$(voice)
+      // Here, we'll make our modules but not hook them up yet:
+      const sinewave = m$.Osc({ t: m$.Waveforms.SINE }) // A sine wave
+      const squarewave = m$.Osc({ t: m$.Waveforms.SQUARE }) // A square wave
+      const voice = m$.Voice() // Output voice. Note that it has .f for frequency control.
+      const fourFifthFreq = m$.Gain({ g: 0.8, r$: voice.f }) // The output of this is freq x 0.8
+      const fadeOut = m$.ADSR({ p: 0.05, r: 1 }, voice) // Controls the tone on/off and fadeout
+      const multResult = m$.Gain() // Multiples tones together for FM
+
+      // Wire frequency controls and fade out controls:
+      voice.f.$(sinewave.f) // Link voice frequency control to sine wave oscillator
+      fourFifthFreq.$(squarewave.f) // Control the square wave oscillator
+      fadeOut.$(squarewave.g) // Controls the square wave's gain, causing it to fade out
+
+      // Now connect the audio routing of the modules:
+      sinewave.$(multResult) // Connect sine wave to multiplier audio input
+      squarewave.$(multResult.g) // And connect square wave to multiplier gain control
+      multResult.$(voice) // The multiplier goes directly to the voice output
+
+      // We are required to return the voice.
       return voice
     },
     freq: 440,
