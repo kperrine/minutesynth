@@ -1,12 +1,12 @@
 "use strict";
 
-function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, noteOff, callback) {
+async function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, noteOff, callback) {
   console.log('Beginning rendering.')
   var R = sampleRate
   let oac = new OfflineAudioContext(1, ~~(R * dur), R)
   let synth = new MinuteSynth(oac)
 
-  let voice = voiceFunc(synth)
+  let voice = await voiceFunc(synth)
   let now = synth.now()
   voice.off(now)
   voice.on(now, noteFreq)

@@ -166,13 +166,13 @@ function checkKeyVoice() {
     }
 }
 
-function createKeyVoice() {
+async function createKeyVoice() {
     const snippet = document.getElementById("snippet").value
     const voiceFunc = prepVoiceFunc(snippet)
     clearKeyVoice()
     if (voiceFunc) {
         try {
-            keyVoice = voiceFunc(synthInst)
+            keyVoice = await voiceFunc(synthInst)
             checkKeyVoice()
         }
         catch (exc) {
@@ -183,7 +183,7 @@ function createKeyVoice() {
     }
 }
 
-function playKey(offset) {
+async function playKey(offset) {
     console.log(`Activating Key: ${offset}`)
     if (!synthInst) {
         synthInit()
@@ -192,7 +192,7 @@ function playKey(offset) {
         synthInst.ac.resume()
     }
     if (!keyVoice) {
-        createKeyVoice()
+        await createKeyVoice()
         if (keyVoice) {
             keyVoice.$(analyzer)
         }
@@ -234,6 +234,7 @@ function highlightKey(keyID, activate) {
         }
     }
 }
+
 function keyZoneMovement(event) {
     if (event && !event.isPrimary) {
         return
@@ -248,14 +249,16 @@ function keyZoneMovement(event) {
         if (activeID !== "" && activeID != currentID) {
             highlightKey(activeID, false)
             //pressAction(event)
-            playKey(MAPPING[currentID])
-            if (keyVoice) {
-                highlightKey(currentID, true)
-                activeID = currentID
-            }
+            playKey(MAPPING[currentID]).then(() => {
+                if (keyVoice) {
+                    highlightKey(currentID, true)
+                    activeID = currentID
+                }
+            })
         }
     }
 }
+
 function pressAction(event) {
     // Detect if code has changed. (Change event executes in wrong order.)
     if (codeCache !== document.getElementById("snippet").value) {
@@ -275,11 +278,12 @@ function pressAction(event) {
         }
     }
     if (currentID !== "") {
-        playKey(MAPPING[currentID])
-        if (keyVoice) {
-            highlightKey(currentID, true)
-            activeID = currentID
-        }
+        playKey(MAPPING[currentID]).then(() => {
+            if (keyVoice) {
+                highlightKey(currentID, true)
+                activeID = currentID
+            }
+        })
     }
 }
 function releaseAction(event) {
@@ -310,7 +314,9 @@ function showRecording() {
 function prepVoiceFunc(snippet) {
     let voiceFunc
     try {
-        voiceFunc = new Function('m$', snippet)
+        // From: https://davidwalsh.name/async-function-class
+        const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor
+        voiceFunc = new AsyncFunction('m$', snippet)
     }
     catch (exc) {
         console.log("ERROR: Function parsing: " + exc)
@@ -318,14 +324,15 @@ function prepVoiceFunc(snippet) {
     }
     return voiceFunc
 }
-function render(voiceName, voiceCode, sampleRate, recordLen, noteFreq, noteOff) {
+
+async function render(voiceName, voiceCode, sampleRate, recordLen, noteFreq, noteOff) {
     const voiceFunc = prepVoiceFunc(voiceCode)
     if (voiceFunc) {
-        record8(voiceName, voiceFunc, sampleRate, recordLen, noteFreq, noteOff, _makeLink)
+        await record8(voiceName, voiceFunc, sampleRate, recordLen, noteFreq, noteOff, _makeLink)
     }
 }
 
-function recPlay() {
+async function recPlay() {
     if (!synthInst) {
         synthInit();
     }
@@ -343,7 +350,7 @@ function recPlay() {
     recordLen = recordLen ? Number(recordLen) : 3.95;
 
     // Render the voice out to time duration:
-    render(voiceName, snippet, sampleRate, recordLen, noteFreq, noteOff);
+    await render(voiceName, snippet, sampleRate, recordLen, noteFreq, noteOff);
 }
 
 function init() {
