@@ -48,6 +48,14 @@ class MinuteSynth {
   NOISE_LEN = 1.0
 
   /**
+   * Utility function for getting the key name of a given value in an object
+   * @param {*} object
+   * @param {*} value 
+   * @returns {string | undefined} The key name corresponding to the given value, or undefined if not found
+   */
+  static getKeyByValue = (object, value) => Object.keys(object).find(key => object[key] === value)
+
+  /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
    * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
    */
@@ -77,12 +85,20 @@ class MinuteSynth {
      * outParams is a list of parameters that this module is attached to
      * @type {Param[]}
      */
-    #outParams = []
+    _outParams = []
+
+    /**
+     * getAudioNode returns the WebAudio AudioNode that this module contains
+     */
+    getAudioNode() {
+      // TODO: We may want to be more definitive about this, or 
+      return this._params.find(param => param instanceof this.ParamStart)._obj
+    }
 
     /** Represents a parameter that allows for attachment to another module or constant as input */
     Param = (parent => class Param {
       /** @type {SynthModule[]} */
-      #inModules
+      _inModules
 
       /** @type {SynthModule} */
       synthModule = parent
@@ -97,7 +113,7 @@ class MinuteSynth {
         this.name = name
         this._obj = obj
         this._defVal = defVal
-        this.#inModules = []
+        this._inModules = []
         // TODO: Call _addParam() from here because we have our SynthModule reference.
       }
 
@@ -112,7 +128,7 @@ class MinuteSynth {
           if (!isNaN(module)) {
             module = this.synthModule.minuteSynth.C(module)
           }
-          this.#inModules.push(module)
+          this._inModules.push(module)
           if (module._$(this._obj)) {
             this.z0 && this.z0()
           }
@@ -125,16 +141,19 @@ class MinuteSynth {
        * @param {SynthModule | undefined} inModule 
        */
       detach(inModule) {
-        for (let module of [...this.#inModules]) { // Iterate over copy
+        for (let module of [...this._inModules]) { // Iterate over copy
           if (!inModule || (module === inModule)) {
             [].concat(this._obj).forEach(obj => {
               try {
                 module.z.disconnect(obj)
               } catch (_) {}})
-            inModule && this.#inModules.splice(this.#inModules.indexOf(inModule), 1)
+            inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
           }
         }
       }
+
+        const startParam = this._params.find(param => param instanceof this.ParamStart)
+
     })(this)
 
     ParamValue = class extends this.Param {
@@ -182,6 +201,23 @@ class MinuteSynth {
 
       z0() {
         this.vC(0)
+      }
+
+      /**
+       * Reassign a new AudioNode's AudioParam to this parameter object, and attach connections
+       * @param {AudioNode} newNode
+       */
+      renew(newNode) {
+        const audioNode = this.synthModule.getAudioNode()
+        const key = MinuteSynth.getKeyByValue(audioNode, this._obj)
+        newNode[key].value = param._obj.value
+        this._inModules.forEach(module => {
+          const inParam = module._outParams.find(p => p._obj === this._obj)
+          if (inParam) {
+            inParam._obj.connect(newNode[key])
+          }
+        })
+        param._obj = newNode[key]
       }
     }
 
@@ -256,7 +292,7 @@ class MinuteSynth {
         param = tgtThing._params[tgtParamName || 'in']
       }
       param.r$(this)
-      this.#outParams.push(param)
+      this._outParams.push(param)
       return tgtThing // Allows chaining of commands
     }
 
@@ -295,11 +331,11 @@ class MinuteSynth {
      * @param {string | null | undefined} paramName 
      */
     detach(tgtModule, paramName) {
-      for (let param of [...this.#outParams]) {
+      for (let param of [...this._outParams]) {
         if (!tgtModule || (param.synthModule === tgtModule)) {
           if (!paramName || (param.name === paramName)) {
             param.detach(this)
-            this.#outParams.splice(this.#outParams.indexOf(param), 1)
+            this._outParams.splice(this._outParams.indexOf(param), 1)
           }
         }
       }
@@ -358,16 +394,15 @@ class MinuteSynth {
 
   BaseAmp = class extends this.SynthModule {
     /**
-     * Establishes a base module with a gain node for controlling output level (default unity gain)
-     * @param {number | undefined} gainVal - Default gain, including negative values to flip the waveform
-     */
-
-    /**
      * Calculates the scale-control rate for frequency-based modules
      * @type {function(number): number}
      */
     _calcSCRate
 
+    /**
+     * Establishes a base module with a gain node for controlling output level (default unity gain)
+     * @param {number | undefined} gainVal - Default gain, including negative values to flip the waveform
+     */
     constructor(gainVal = 1) {
       super()
       this.z = this.minuteSynth.ac.createGain()
@@ -435,15 +470,18 @@ class MinuteSynth {
    * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
    * @param {number | SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
+   * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
    * @returns {SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = 0, F = this.ac.sampleRate, r = 1, d, n = 0 }) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0 }, t$) {
     const Module = class Buf extends this.BaseAmp {
       b = this.minuteSynth.ac.createBuffer(c, ~~(F * T), F)
       B = this.minuteSynth.ac.createBufferSource()
       T = T
       F = F
       N = ~~(F * T)
+      #autoStarted = false
+      #needsRegen = false
       _calcSCRate = freq => freq * S * T
 
       constructor() {
@@ -456,9 +494,105 @@ class MinuteSynth {
         else {
           this._addParam(new this.ParamValue('r', this.B.playbackRate, r))
         }
+        this._addParam(new this.ParamAudio(this, t$))
         this.B.connect(this.z)
         // TODO: n isn't used except for determing if we are frequency controlled.
       }
+
+      /**
+       * Renew will dereference the current BufferSource and attach a new one.
+       * This is needed because the ending of a BufferSource renders it unusable.
+       */
+      renew() {
+        // TODO: Take what we learn from this and generalize it for any
+        // AudioNode, if need be.
+        //const newB = this.minuteSynth.ac.createBufferSource()
+        const startParam = this._params.find(param => param instanceof this.ParamStart)
+        const newNode = startParam._obj.create()
+
+
+        // Repatch parameters belonging to this module:
+        this._params.forEach(param => {
+          if (param instanceof this.ParamAudio) {
+
+          }
+          else if (param instanceof this.ParamValue) {
+            const key = getKeyByValue(startParam._obj, param._obj)
+            newNode[key].value = param._obj.value
+            param._inModules.forEach(module => {
+              const inParam = module._outParams.find(p => p._obj === param._obj)
+              if (inParam) {
+                inParam._obj.connect(newNode[key])
+              }
+            })
+            param._obj = newNode[key]
+          }
+        })
+
+        // Repatch parameters coming into this module:
+
+
+        // Repatch parameters going to other modules:
+        const outParams = this.outParams
+
+        startParam._obj = newNode
+        newNode.connect(this.z)
+      }
+
+_=`
+      /**
+       * Renew will dereference the current BufferSource and attach a new one.
+       * This is needed because the ending of a BufferSource renders it unusable.
+       */
+      respawn() {
+        // We don't want to disconnect it because we don't want its sound to cut out.
+        // But we want to dereference it here.
+
+      }
+`
+`
+      /**
+       * on is called manually or by the Voice to engage the ADSR action (attack, decay,
+       * sustain).
+       * @param {number} onTime - The time at which to start the ADSR action.
+       * @param {number} freq - Ununsed
+       */
+      on(onTime, freq) {
+        // TODO: Allow onTime to be 0 for immediate action
+        if (this.#newState) {
+          this.v.vT(this.a.b, onTime)
+          this.#newState = false
+        }
+        else {
+          this.v.c(onTime + this.a.D)
+        }
+        this.v.t(this.a.e, onTime + this.a.D, this.a.a / 3)
+        this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
+        this.#offState = false
+        if (this.a.p) {
+          this.off(onTime + this.a.p)
+        }
+      }
+
+      /** 
+       * triggerOff will cause the ADSR action to conclude (release).
+       * @param {number} offTime - The time at which to start the release action.
+       */
+      off(offTime) {
+        // TODO: Allow offTime to be 0 for immediate action
+        if (this.#offState) {
+          this.v.vT(this.a.b, offTime)
+        }
+        else {
+          this.v.c(offTime) // if note duration is shorter than A + D.
+          this.v.t(this.a.b, offTime, this.a.r / 3)
+          //Z.v.vT(Z.a.b, offTime + Z.a.r + 6) // Force zero because t doesn't get there.
+          this.#offState = true
+        }
+      }
+`
+
+
 
       /**
        * Exposes the buffer for specified channel
@@ -476,6 +610,7 @@ class MinuteSynth {
       lock(loop = true) {
         this.B.buffer = this.b
         this.B.loop = loop
+        // Consider starting? Starting on play?
       }
     }      
     return new Module()
@@ -940,7 +1075,7 @@ class MinuteSynth {
     const fadeInSampleFrames = ~~(fadeInTime * this.ac.sampleRate)
     // 60dB is a factor of 1 million in power, or 1000 in amplitude.
     const decayBase = 1e-3 ** (1 / decaySampleFrames)
-    const reverbIR = this.Buf({ c: numChan, T: totalTime })
+    const reverbIR = this.Buf({ c: numChan, T: totalTime, s: 0 })
     for (let i = 0; i < numChan; i++) {
       let chan = reverbIR.mem(i)
       for (let j = 0; j < reverbIR.N; j++) {
