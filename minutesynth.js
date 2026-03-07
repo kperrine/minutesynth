@@ -48,10 +48,10 @@ class MinuteSynth {
   NOISE_LEN = 1.0
 
   /**
-   * Utility function for getting the key name of a given value in an object
-   * @param {*} object
+   * Returns the key (attribute) name that a given object (value) is stored under, or undefined
+   * @param {*} object 
    * @param {*} value 
-   * @returns {string | undefined} The key name corresponding to the given value, or undefined if not found
+   * @returns {string | undefined}
    */
   static getKeyByValue = (object, value) => Object.keys(object).find(key => object[key] === value)
 
@@ -86,14 +86,6 @@ class MinuteSynth {
      * @type {Param[]}
      */
     _outParams = []
-
-    /**
-     * getAudioNode returns the WebAudio AudioNode that this module contains
-     */
-    getAudioNode() {
-      // TODO: We may want to be more definitive about this, or 
-      return this._params.find(param => param instanceof this.ParamStart)._obj
-    }
 
     /** Represents a parameter that allows for attachment to another module or constant as input */
     Param = (parent => class Param {
@@ -151,9 +143,6 @@ class MinuteSynth {
           }
         }
       }
-
-        const startParam = this._params.find(param => param instanceof this.ParamStart)
-
     })(this)
 
     ParamValue = class extends this.Param {
@@ -201,23 +190,6 @@ class MinuteSynth {
 
       z0() {
         this.vC(0)
-      }
-
-      /**
-       * Reassign a new AudioNode's AudioParam to this parameter object, and attach connections
-       * @param {AudioNode} newNode
-       */
-      renew(newNode) {
-        const audioNode = this.synthModule.getAudioNode()
-        const key = MinuteSynth.getKeyByValue(audioNode, this._obj)
-        newNode[key].value = param._obj.value
-        this._inModules.forEach(module => {
-          const inParam = module._outParams.find(p => p._obj === this._obj)
-          if (inParam) {
-            inParam._obj.connect(newNode[key])
-          }
-        })
-        param._obj = newNode[key]
       }
     }
 
@@ -390,6 +362,35 @@ class MinuteSynth {
       this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate(1)))
       gainModule.z.connect(control)
     }
+
+    /**
+     * Renew will dereference the current AudioNode and attach a new one.
+     * @param {AudioNode} node - The old AudioNode to replace
+     * @param {AudioNode | undefined} newNode - The AudioNode to replace. If not provided, will the old one
+     * @return {AudioNode} The new AudioNode that is now attached to this module's parameters.
+     */
+    renew(node, newNode) {
+      if (!newNode) {
+        newNode = Object.create(node)
+      }
+      this._params.forEach(param => {
+        const key = MinuteSynth.getKeyByValue(node, param._obj)
+        if (key) {
+          newNode[key].value = param._obj.value
+          param._inModules.forEach(module => {
+            const inParam = module._outParams.find(p => p._obj === this._obj)
+            if (inParam) {
+              inParam._obj.connect(newNode[key])
+            }
+          })
+          param._obj = newNode[key]
+        }
+        else if (param._obj === node) {
+          param._obj = newNode
+        }
+      })
+      return newNode
+    }
   })(this)
 
   BaseAmp = class extends this.SynthModule {
@@ -504,51 +505,11 @@ class MinuteSynth {
        * This is needed because the ending of a BufferSource renders it unusable.
        */
       renew() {
-        // TODO: Take what we learn from this and generalize it for any
-        // AudioNode, if need be.
-        //const newB = this.minuteSynth.ac.createBufferSource()
-        const startParam = this._params.find(param => param instanceof this.ParamStart)
-        const newNode = startParam._obj.create()
-
-
-        // Repatch parameters belonging to this module:
-        this._params.forEach(param => {
-          if (param instanceof this.ParamAudio) {
-
-          }
-          else if (param instanceof this.ParamValue) {
-            const key = getKeyByValue(startParam._obj, param._obj)
-            newNode[key].value = param._obj.value
-            param._inModules.forEach(module => {
-              const inParam = module._outParams.find(p => p._obj === param._obj)
-              if (inParam) {
-                inParam._obj.connect(newNode[key])
-              }
-            })
-            param._obj = newNode[key]
-          }
-        })
-
-        // Repatch parameters coming into this module:
-
-
-        // Repatch parameters going to other modules:
-        const outParams = this.outParams
-
-        startParam._obj = newNode
+        this.B = super.renew(this.B)
         newNode.connect(this.z)
       }
 
 _=`
-      /**
-       * Renew will dereference the current BufferSource and attach a new one.
-       * This is needed because the ending of a BufferSource renders it unusable.
-       */
-      respawn() {
-        // We don't want to disconnect it because we don't want its sound to cut out.
-        // But we want to dereference it here.
-
-      }
 `
 `
       /**
