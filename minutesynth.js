@@ -466,23 +466,25 @@ class MinuteSynth {
    * @param {number | undefined} c - number of channels (default: 1)
    * @param {number | undefined} S - scale (default: 1)
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
-   * @param {number | undefined} s - start time (default: 0)
+   * @param {number | undefined} s - start time (default: -1 to defer)
    * @param {number | undefined} F - sampling rate (default: AudioContext's sample rate)
    * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
    * @param {number | SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
+   * @param {boolean | undefined} L - Enables looping if set to true
+   * @param {number | undefined} p - Loop begin in seconds with respect to nominal frequency (default: 0)
+   * @param {number | undefined} P - Loop end in seconds with respect to nominal frequency (default: end)
    * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
    * @returns {SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0 }, t$) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0, L, p, P }, t$) {
     const Module = class Buf extends this.BaseAmp {
       b = this.minuteSynth.ac.createBuffer(c, ~~(F * T), F)
       B = this.minuteSynth.ac.createBufferSource()
-      T = T
-      F = F
-      N = ~~(F * T)
-      #autoStarted = false
-      #needsRegen = false
+      L = L
+      p = p
+      P = P
+      #autoMode = false
       _calcSCRate = freq => freq * S * T
 
       constructor() {
@@ -495,9 +497,70 @@ class MinuteSynth {
         else {
           this._addParam(new this.ParamValue('r', this.B.playbackRate, r))
         }
+        this.#applyAttrs()
         this._addParam(new this.ParamAudio(this, t$))
         this.B.connect(this.z)
-        // TODO: n isn't used except for determing if we are frequency controlled.
+      }
+
+      /**
+       * on is called manually or by the Voice to engage a playback action.
+       * Looping is automatically handled, assuming rate isn't changed mid-playback.
+       * @param {number} onTime - The time at which to start the play action; 0 for immmediate.
+       * @param {number} freq - If specified, used to calculate the playback rate
+       */
+      on(onTime, freq) {
+        this.#autoMode = true
+        nowTime = this.minuteSynth.now()
+        if (!onTime) {
+          onTime = nowTime
+        }
+        if (onTime < nowTime) {
+          onTime = nowTime
+        }
+        setTimeout(() => {
+          this.#applyAttrs()
+          this.B.start(onTime)
+        }, (onTime - nowTime) * 1000)
+      }
+
+      /** 
+       * off will cause the playback action to conclude (release).
+       * @param {number} offTime - The time at which to start the release action.
+       */
+      off(offTime) {
+        nowTime = this.minuteSynth.now()
+        if (!offTime) {
+          offTime = nowTime
+        }
+        if (offTime < nowTime) {
+          offTime = nowTime
+        }
+        if (!this.#autoMode) {
+          // If we didn't start with an "on", then stop immediately.
+          this.B.stop(offTime)
+          return
+        }
+        setTimeout(() => {
+          this.B.loop = false
+          this.renew()
+        }, (onTime - nowTime) * 1000)
+      }
+
+      /**
+       * Applies scalar attributes
+       */
+      #applyAttrs() {
+        if (this.L) {
+          this.B.loop = this.L
+        }
+        if (this.p) {
+          // TODO: Need to calculate!
+          this.B.loopStart = this.p
+        }
+        if (this.P) {
+          // TODO: Need to calculate!
+          this.B.loopEnd = this.P
+        }
       }
 
       /**
@@ -505,8 +568,10 @@ class MinuteSynth {
        * This is needed because the ending of a BufferSource renders it unusable.
        */
       renew() {
+        this.#autoMode = false
         this.B = super.renew(this.B)
-        newNode.connect(this.z)
+        this.#applyAttrs()
+        this.B.connect(this.z)
       }
 
 _=`
