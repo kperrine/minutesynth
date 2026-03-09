@@ -693,7 +693,7 @@ const ToneDefs = {
       for (let i = 0; i < bufLen; i++) {
         mem[i] = srcBuf[i]
       }
-      tgtBuf.lock(false)
+      tgtBuf.lock()
 
       // Set up output voice, and connect my MinuteSynth module buffer to it:
       const voice = m$.Voice()

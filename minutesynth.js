@@ -518,7 +518,7 @@ class MinuteSynth {
           onTime = nowTime
         }
         setTimeout(() => {
-          this.#applyAttrs()
+          this.#applyAttrs(freq)
           this.B.start(onTime)
         }, (onTime - nowTime) * 1000)
       }
@@ -549,10 +549,11 @@ class MinuteSynth {
       /**
        * Applies scalar attributes
        */
-      #applyAttrs() {
+      #applyAttrs(freq) {
         if (this.L) {
           this.B.loop = this.L
         }
+        //freq
         if (this.p) {
           // TODO: Need to calculate!
           this.B.loopStart = this.p
@@ -574,52 +575,6 @@ class MinuteSynth {
         this.B.connect(this.z)
       }
 
-_=`
-`
-`
-      /**
-       * on is called manually or by the Voice to engage the ADSR action (attack, decay,
-       * sustain).
-       * @param {number} onTime - The time at which to start the ADSR action.
-       * @param {number} freq - Ununsed
-       */
-      on(onTime, freq) {
-        // TODO: Allow onTime to be 0 for immediate action
-        if (this.#newState) {
-          this.v.vT(this.a.b, onTime)
-          this.#newState = false
-        }
-        else {
-          this.v.c(onTime + this.a.D)
-        }
-        this.v.t(this.a.e, onTime + this.a.D, this.a.a / 3)
-        this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
-        this.#offState = false
-        if (this.a.p) {
-          this.off(onTime + this.a.p)
-        }
-      }
-
-      /** 
-       * triggerOff will cause the ADSR action to conclude (release).
-       * @param {number} offTime - The time at which to start the release action.
-       */
-      off(offTime) {
-        // TODO: Allow offTime to be 0 for immediate action
-        if (this.#offState) {
-          this.v.vT(this.a.b, offTime)
-        }
-        else {
-          this.v.c(offTime) // if note duration is shorter than A + D.
-          this.v.t(this.a.b, offTime, this.a.r / 3)
-          //Z.v.vT(Z.a.b, offTime + Z.a.r + 6) // Force zero because t doesn't get there.
-          this.#offState = true
-        }
-      }
-`
-
-
-
       /**
        * Exposes the buffer for specified channel
        * @param {number | undefined} chan - Channel number (default: 0)
@@ -630,13 +585,10 @@ _=`
       }
 
       /**
-       * Commits all channels of the exposed buffer, with optional ability to specify looping.
-       * @param {boolean} loop - Whether to loop the buffer when played (default: true) 
+       * Commits all channels of the exposed buffer
        */
-      lock(loop = true) {
+      lock() {
         this.B.buffer = this.b
-        this.B.loop = loop
-        // Consider starting? Starting on play?
       }
     }      
     return new Module()
@@ -651,7 +603,7 @@ _=`
    * @returns {SynthModule} An instance of a noise module
    */
   Noise({ g = 1, s = 0, r, d } = {}) {
-    const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0 })
+    const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0, L: true })
     const data = module.mem()
     for (let i = 0; i < module.N; i++) {
       data[i] = Math.random() * 2 - 1
@@ -673,7 +625,7 @@ _=`
    */
   Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
-    const module = this.Buf({ T: W / this.ac.sampleRate, S, f, g, s, n: 1 })
+    const module = this.Buf({ T: W / this.ac.sampleRate, S, f, g, s, n: 1, L: true })
     const data = module.mem()
     const bias = 0.5 - w
     for (let i in data) {
