@@ -231,6 +231,7 @@ class MinuteSynth {
        * @param {number | undefined} startTime 
        */
       go(startTime = 0) {
+        console.log(`Start time: ${startTime}`)
         this._obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
       }
 
@@ -239,6 +240,7 @@ class MinuteSynth {
        * @param {number | undefined} stopTime 
        */
       stop(stopTime = 0) {
+        console.log(`Stop time: ${stopTime}`)
         this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
         // TODO: Consider scheduling an object detach() at stopTime
       }
@@ -373,7 +375,7 @@ class MinuteSynth {
       if (!newNode) {
         newNode = Object.create(node)
       }
-      this._params.forEach(param => {
+      Object.keys(this._params).forEach(param => {
         const key = MinuteSynth.getKeyByValue(node, param._obj)
         if (key) {
           newNode[key].value = param._obj.value
@@ -489,6 +491,7 @@ class MinuteSynth {
 
       constructor() {
         super(g)
+        console.log(`Start parameter: ${s}`)
         this._addParam(new this.ParamStart(this.B, s))
         this._addParam(new this.ParamValue('d', this.B.detune, d))
         if (n) {
@@ -509,8 +512,9 @@ class MinuteSynth {
        * @param {number} freq - If specified, used to calculate the playback rate
        */
       on(onTime, freq) {
+        console.log(`Buffer on at ${onTime} with freq ${freq}`)
         this.#autoMode = true
-        nowTime = this.minuteSynth.now()
+        const nowTime = this.minuteSynth.now()
         if (!onTime) {
           onTime = nowTime
         }
@@ -528,7 +532,8 @@ class MinuteSynth {
        * @param {number} offTime - The time at which to start the release action.
        */
       off(offTime) {
-        nowTime = this.minuteSynth.now()
+        console.log(`Buffer off at: ${offTime}`)
+        const nowTime = this.minuteSynth.now()
         if (!offTime) {
           offTime = nowTime
         }
@@ -543,7 +548,7 @@ class MinuteSynth {
         setTimeout(() => {
           this.B.loop = false
           this.renew()
-        }, (onTime - nowTime) * 1000)
+        }, (offTime - nowTime) * 1000)
       }
 
       /**
@@ -553,14 +558,14 @@ class MinuteSynth {
         if (this.L) {
           this.B.loop = this.L
         }
-        //freq
+        if (!freq) {
+          freq = 1
+        }
         if (this.p) {
-          // TODO: Need to calculate!
-          this.B.loopStart = this.p
+          this.B.loopStart = this.p * n / freq / S
         }
         if (this.P) {
-          // TODO: Need to calculate!
-          this.B.loopEnd = this.P
+          this.B.loopEnd = this.P * n / freq / S
         }
       }
 
@@ -569,6 +574,7 @@ class MinuteSynth {
        * This is needed because the ending of a BufferSource renders it unusable.
        */
       renew() {
+        console.log('Renewing buffer source')
         this.#autoMode = false
         this.B = super.renew(this.B)
         this.#applyAttrs()
@@ -605,7 +611,7 @@ class MinuteSynth {
   Noise({ g = 1, s = 0, r, d } = {}) {
     const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0, L: true })
     const data = module.mem()
-    for (let i = 0; i < module.N; i++) {
+    for (let i = 0; i < data.length; i++) {
       data[i] = Math.random() * 2 - 1
     }
     module.lock()
@@ -629,7 +635,7 @@ class MinuteSynth {
     const data = module.mem()
     const bias = 0.5 - w
     for (let i in data) {
-      data[i] = bias + ((((i - module.N * o) % module.N) / module.N <= w) ? 0.5 : -0.5)
+      data[i] = bias + ((((i - data.length * o) % data.length) / data.length <= w) ? 0.5 : -0.5)
     }
     module.lock()
     return module
@@ -1056,7 +1062,7 @@ class MinuteSynth {
     const reverbIR = this.Buf({ c: numChan, T: totalTime, s: 0 })
     for (let i = 0; i < numChan; i++) {
       let chan = reverbIR.mem(i)
-      for (let j = 0; j < reverbIR.N; j++) {
+      for (let j = 0; j < chan.length; j++) {
         chan[j] = (Math.random() > subsample) ? (Math.random() * 2 - 1) * decayBase ** j : 0
       }
       for (let j = 0; j < fadeInSampleFrames; j++) {
