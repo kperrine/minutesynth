@@ -355,6 +355,7 @@ class MinuteSynth {
       }
       this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate(1)))
       gainModule.z.connect(control)
+      return gainModule
     }
 
     /**
@@ -486,6 +487,7 @@ class MinuteSynth {
       p = p
       P = P
       #autoMode = false
+      #fGain
       _calcSCRate = freq => freq * S * T
 
       constructor() {
@@ -494,7 +496,7 @@ class MinuteSynth {
         this._addParam(new this.ParamStart(this.B, s))
         this._addParam(new this.ParamValue('d', this.B.detune, d))
         if (n) {
-          this._addFreqHelper(this.B.playbackRate, n)
+          this.#fGain = this._addFreqHelper(this.B.playbackRate, n)
         }
         else {
           this._addParam(new this.ParamValue('r', this.B.playbackRate, r))
@@ -577,6 +579,9 @@ class MinuteSynth {
         this.#autoMode = false
         this.B = super.renew(this.B, this.minuteSynth.ac.createBufferSource())
         this.#applyAttrs()
+        if (this.#fGain) {
+          this.#fGain.z.connect(this.B.playbackRate)
+        }
         this.B.connect(this.z)
       }
 
