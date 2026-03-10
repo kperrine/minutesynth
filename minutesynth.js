@@ -48,14 +48,6 @@ class MinuteSynth {
   NOISE_LEN = 1.0
 
   /**
-   * Returns the key (attribute) name that a given object (value) is stored under, or undefined
-   * @param {*} object 
-   * @param {*} value 
-   * @returns {string | undefined}
-   */
-  static getKeyByValue = (object, value) => Object.keys(object).find(key => object[key] === value)
-
-  /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
    * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
    */
@@ -368,15 +360,22 @@ class MinuteSynth {
     /**
      * Renew will dereference the current AudioNode and attach a new one.
      * @param {AudioNode} node - The old AudioNode to replace
-     * @param {AudioNode | undefined} newNode - The AudioNode to replace. If not provided, will the old one
+     * @param {AudioNode} newNode - The AudioNode to replace. (Sorry, can't discern from the old one.)
      * @return {AudioNode} The new AudioNode that is now attached to this module's parameters.
      */
     renew(node, newNode) {
-      if (!newNode) {
-        newNode = Object.create(node)
+      // Function to return the key (attribute) name that a given object (value) is stored under
+      // whether own or from prototype, or undefined
+      const getKeyByValue = (object, value) => {
+        for (let key in object) {
+          if (object[key] === value) {
+            return key
+          }
+        }
       }
-      Object.keys(this._params).forEach(param => {
-        const key = MinuteSynth.getKeyByValue(node, param._obj)
+
+      Object.values(this._params).forEach(param => {
+        const key = getKeyByValue(node, param._obj)
         if (key) {
           newNode[key].value = param._obj.value
           param._inModules.forEach(module => {
@@ -576,7 +575,7 @@ class MinuteSynth {
       renew() {
         console.log('Renewing buffer source')
         this.#autoMode = false
-        this.B = super.renew(this.B)
+        this.B = super.renew(this.B, this.minuteSynth.ac.createBufferSource())
         this.#applyAttrs()
         this.B.connect(this.z)
       }
