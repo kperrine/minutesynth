@@ -462,8 +462,8 @@ class MinuteSynth {
   }
 
   /**
-   * Buf (Buffer) represents a block of memory that specifies samples. Access the memory with x();
-   * the length of the buffer is length. Call L() to lock in the memory so that the buffer can be used.
+   * Buf (Buffer) represents a block of memory that specifies samples. Access the memory with mem();
+   * the length of the buffer is .length property.
    * @param {number | undefined} T - duration of the buffer in seconds (default: 1)
    * @param {number | undefined} c - number of channels (default: 1)
    * @param {number | undefined} S - scale (default: 1)
@@ -503,6 +503,7 @@ class MinuteSynth {
         }
         this.#applyAttrs()
         this._addParam(new this.ParamAudio(this, t$))
+        this.B.buffer = this.b
         this.B.connect(this.z)
       }
 
@@ -514,7 +515,6 @@ class MinuteSynth {
        */
       on(onTime, freq) {
         console.log(`Buffer on at ${onTime} with freq ${freq}`)
-        this.#autoMode = true
         const nowTime = this.minuteSynth.now()
         if (!onTime) {
           onTime = nowTime
@@ -522,8 +522,18 @@ class MinuteSynth {
         if (onTime < nowTime) {
           onTime = nowTime
         }
+        if (this.#autoMode) {
+          // We are playing already. Must stop and refresh first.
+          this.B.stop(onTime)
+        }
         setTimeout(() => {
-          this.#applyAttrs(freq)
+          if (this.#autoMode) {
+            this.renew()
+          }
+          else {
+            this.#applyAttrs(freq)
+          }
+          this.#autoMode = true
           this.B.start(onTime)
         }, (onTime - nowTime) * 1000)
       }
@@ -582,6 +592,7 @@ class MinuteSynth {
         if (this.#fGain) {
           this.#fGain.z.connect(this.B.playbackRate)
         }
+        this.B.buffer = this.b
         this.B.connect(this.z)
       }
 
@@ -592,13 +603,6 @@ class MinuteSynth {
        */
       mem(chan = 0) {
         return this.b.getChannelData(chan)
-      }
-
-      /**
-       * Commits all channels of the exposed buffer
-       */
-      lock() {
-        this.B.buffer = this.b
       }
     }      
     return new Module()
@@ -618,7 +622,6 @@ class MinuteSynth {
     for (let i = 0; i < data.length; i++) {
       data[i] = Math.random() * 2 - 1
     }
-    module.lock()
     return module
   }
 
@@ -641,7 +644,6 @@ class MinuteSynth {
     for (let i in data) {
       data[i] = bias + ((((i - data.length * o) % data.length) / data.length <= w) ? 0.5 : -0.5)
     }
-    module.lock()
     return module
   }
 
