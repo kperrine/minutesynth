@@ -75,19 +75,19 @@ ADSR parameters (see the [Intro docs](intro.md#adsr-controls) for a diagram that
 
 ### Buf (Buffer)
 
-`Buf({ T=1, c=1, S=1, g=1, s=0, F=AudioContext.samplerate, r=1, d, n=0, f })`
+`Buf({ T: 1, c: 1, S: 1, g: 1, s: -1, F: AudioContext.samplerate, r: 1, d, n: 0, L, p, P }, t$)`
 
-Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is `.mem().length`. Call `.lock()` to lock in the memory so that the buffer can be used. See additional notes on `Buf` further below.
+Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is the returned buffer's `.length`. See additional notes on `Buf` further below.
 
-Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1`, `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate; `d:` detune; `n:` nominal playback frequency (0 for no freq. control)
+Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1`, `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate; `d:` detune; `n:` nominal playback frequency (0 for no freq. control), `L:` enables looping if true, `p:` loop begin in seconds with respect to nominal frequence (default: 0), and `P:` loop end (default: end).
+
+Pass in `t$` from a trigger source to trigger the buffer's playback.
 
 Methods:
 
 **`.mem(chan=0)`:** Returns an editable array that represents the sample buffer for the given channel. Generally, for "left" or "mono", `chan` should be `0`.
 
-**`.lock(loop=true)`:** Commits the buffer memory so that it can be played back. Set `loop` to `true` to allow the buffer to play repeatedly, or `false` to just play once.
-
-After instantiation, the `.s` property allows for on/off control with `.s.go(startTime)` and `.s.stop(startTime)` respectively.
+After instantiation, the `.s` property allows for on/off control with `.s.go(startTime)` and `.s.stop(startTime)` respectively. And, the `t$` reference will trigger the calling of `.on(onTime, freq)` and `.off(offTime)`.
 
 ---
 
