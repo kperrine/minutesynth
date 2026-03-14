@@ -339,6 +339,21 @@ const ToneDefs = {
     off: 1,
     rec: 2
   },
+  beep: {
+    fn: m$ => {
+      // Build up a basic square wave that pulses for a quarter second
+      const voice = m$.Voice()
+      const osc = m$.Osc({
+          t: 'triangle',
+          f: voice.f,  // Use Voice frequency control
+          g: m$.ADSR({ p: 1/4, x: true }, voice) // And auto-pulse for a quarter second
+      })
+      osc.$(voice) // Connect the output of the osc to the voice
+      return voice
+    },
+    off: 0.5,
+    rec: 0.5
+  },
   click: {
     fn: m$ => {
       // NOTE: Currently does not respond to Voice frequency input.
@@ -706,7 +721,7 @@ const ToneDefs = {
   },
   zzFx2: {
     fn: async function(m$) {
-      // Example of triggering playback from Frank Force's ZzFx library:
+      // Example of playing ZzFx sounds by calling zzfx() directly with triggering:
       // -----
       let // ZzFXMicro - Zuper Zmall Zound Zynth - v1.3.2 by Frank Force
       zzfxV=.3,               // volume

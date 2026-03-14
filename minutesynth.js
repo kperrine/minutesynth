@@ -19,9 +19,10 @@ class MinuteSynth {
      * @param {number | undefined} s - sustain value (after the attack-decay sequence
      * @param {number | undefined} r - release time (from s to b, occurring when triggerOff() is called)
      * @param {number | undefined} p - auto-pulse-- if nonzero, automatically does a triggerOff p seconds after triggerOn.
+     * @param {boolean | undefined} x - If true, will prevent auto-pulse from ending early
      */     
-    constructor({ D = 0, b = 0, e = 1, a = 1e-3, d = 0, s = 1, r = 0, p = 0 } = {}) {
-      Object.assign(this, { D, b, e, a, d, s, r, p })
+    constructor({ D = 0, b = 0, e = 1, a = 1e-3, d = 0, s = 1, r = 0, p = 0, x = false } = {}) {
+      Object.assign(this, { D, b, e, a, d, s, r, p, x })
     }
   }
 
@@ -98,7 +99,6 @@ class MinuteSynth {
         this._obj = obj
         this._defVal = defVal
         this._inModules = []
-        // TODO: Call _addParam() from here because we have our SynthModule reference.
       }
 
       /**
@@ -545,7 +545,7 @@ class MinuteSynth {
       off(offTime) {
         console.log(`Buffer off at: ${offTime}`)
         const nowTime = this.minuteSynth.now()
-        if (!offTime) {
+        if (offTime == null) {
           offTime = nowTime
         }
         if (offTime < nowTime) {
@@ -553,7 +553,7 @@ class MinuteSynth {
         }
         if (!this.#autoMode) {
           // If we didn't start with an "on", then stop immediately.
-          this.B.stop(offTime)
+          this.B.stop()
           return
         }
         setTimeout(() => {
@@ -609,40 +609,56 @@ class MinuteSynth {
   }
 
   /**
-   * Trig - Trigger 
+   * Trig is a helper class that translates a triggering action to an ES6/browser
+   * Window timeout that is called to a trig() method to be implemented.
    */
-  Trig = class {
+  Trig = class Trig extends this.SynthModule {
     #triggered = false
+
+    /**
+     * Called by a trigger source (e.g. Voice) to schedule an activation
+     * @param {number | undefined} onTime - The time WRT AudioContext at which to start the play action; 0 for immmediate.
+     * @param {number | undefined} freq - Frequency value passed along with the triggering event
+     */
     on(onTime, freq) {
       const nowTime = this.minuteSynth.now()
-      if (!onTime) {
-        onTime = nowTime
-      }
-      if (onTime < nowTime) {
-        onTime = nowTime
+      if (onTime != null && onTime < nowTime) {
+        onTime = 0
       }
       if (this.#triggered) {
-        this.trig()
-        this.#triggered = false
+        this.off() // Call off now and do synchronous action
       }
-      setTimeout(() => {
+      const func = () => {
         this.#triggered = true
         this.trig(freq)
-      }, (onTime - nowTime) * 1000)
+      }
+      if (onTime) {
+        setTimeout(func, (onTime - nowTime) * 1000)
+      }
+      else {
+        func() // Keep trig() call in sync if onTime is now.
+      }
     }
 
+    /**
+     * Called by a trigger source (e.g. Voice) to schedule deactivation
+     * @param {number | undefined} offTime - The time WRT AudioContext at which to start the release action; 0 for immediate.
+     */
     off(offTime) {
       const nowTime = this.minuteSynth.now()
-      if (!offTime) {
-        offTime = nowTime
+      if (offTime != null && offTime < nowTime) {
+        offTime = 0
       }
-      if (offTime < nowTime) {
-        offTime = nowTime
-      }
-      setTimeout(() => {
+      const func = () => {
         this.trig()
         this.#triggered = false
-      }, (offTime - nowTime) * 1000)
+      }
+      if (offTime) {
+        setTimeout(func, (offTime - nowTime) * 1000)
+      }
+      else {
+        func() // Keep trig() call in sync if offTime is now.
+      }
     }
 
     trig(freq) {
@@ -855,7 +871,7 @@ class MinuteSynth {
   ADSR(adsr = {}, t$) {
     const Module = class ADSR extends this.BaseC {
       a = { ...MinuteSynth.DEFAULT_ADSR, ...adsr } // Fill in any missing parameters with defaults
-      #offState = true
+      onTime
       #newState = true
 
       constructor() {
@@ -867,11 +883,12 @@ class MinuteSynth {
       /**
        * on is called manually or by the Voice to engage the ADSR action (attack, decay,
        * sustain).
-       * @param {number} onTime - The time at which to start the ADSR action.
-       * @param {number} freq - Ununsed
+       * @param {number | undefined} onTime - The time at which to start the ADSR action.
        */
-      on(onTime, freq) {
-        // TODO: Allow onTime to be 0 for immediate action
+      on(onTime) {
+        if (!onTime) {
+          onTime = this.minuteSynth.now()
+        }
         if (this.#newState) {
           this.v.vT(this.a.b, onTime)
           this.#newState = false
@@ -881,26 +898,31 @@ class MinuteSynth {
         }
         this.v.t(this.a.e, onTime + this.a.D, this.a.a / 3)
         this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
-        this.#offState = false
         if (this.a.p) {
+          this.onTime = null
           this.off(onTime + this.a.p)
         }
+        this.onTime = onTime
       }
 
       /** 
        * triggerOff will cause the ADSR action to conclude (release).
-       * @param {number} offTime - The time at which to start the release action.
+       * @param {number | undefined} offTime - The time at which to start the release action.
        */
       off(offTime) {
-        // TODO: Allow offTime to be 0 for immediate action
-        if (this.#offState) {
+        if (!offTime) {
+          offTime = this.minuteSynth.now()
+        }
+        if (this.a.x && this.onTime != null && this.minuteSynth.now() < (this.onTime + this.a.p)) {
+          return // Disable early release if we have force pulsed action
+        }
+        if (this.onTime == null) {
           this.v.vT(this.a.b, offTime)
         }
         else {
           this.v.c(offTime) // if note duration is shorter than A + D.
           this.v.t(this.a.b, offTime, this.a.r / 3)
-          //Z.v.vT(Z.a.b, offTime + Z.a.r + 6) // Force zero because t doesn't get there.
-          this.#offState = true
+          this.onTime = null
         }
       }
     }
@@ -919,6 +941,9 @@ class MinuteSynth {
     const origOnFn = module.on
     const origOffFn = module.off
     module.on = (onTime, freq) => {
+      if (onTime == null) {
+        onTime = this.minuteSynth.now()
+      }
       t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
         : origOffFn.call(module, onTime + time))
     }
@@ -974,7 +999,9 @@ class MinuteSynth {
        * on() is called manually or by the Voice to set the next frequency.
        */
       on(onTime, freq) {
-        // TODO: Can we use setTarget with 0 time constant?
+        if (!onTime) {
+          onTime = this.minuteSynth.now()
+        }
         if (this.#prevFreq && this.p) {
           this.v.t(freq, onTime, this.p / 3)
         }
@@ -1066,7 +1093,6 @@ class MinuteSynth {
        * This will call on() for all Modules registered.
        */
       on(onTime, freq) {
-        !onTime && (onTime = this.minuteSynth.now())
         this.#modules.forEach(module => module.on && module.on(onTime, freq))
       }
 
@@ -1074,7 +1100,6 @@ class MinuteSynth {
        * This will call off() for all Modules registered.
        */
       off(offTime) {
-        !offTime && (offTime = this.minuteSynth.now())
         this.#modules.forEach(module => module.off && module.off(offTime))
       }
     }
