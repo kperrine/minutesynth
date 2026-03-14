@@ -609,6 +609,48 @@ class MinuteSynth {
   }
 
   /**
+   * Trig - Trigger 
+   */
+  Trig = class {
+    #triggered = false
+    on(onTime, freq) {
+      const nowTime = this.minuteSynth.now()
+      if (!onTime) {
+        onTime = nowTime
+      }
+      if (onTime < nowTime) {
+        onTime = nowTime
+      }
+      if (this.#triggered) {
+        this.trig()
+        this.#triggered = false
+      }
+      setTimeout(() => {
+        this.#triggered = true
+        this.trig(freq)
+      }, (onTime - nowTime) * 1000)
+    }
+
+    off(offTime) {
+      const nowTime = this.minuteSynth.now()
+      if (!offTime) {
+        offTime = nowTime
+      }
+      if (offTime < nowTime) {
+        offTime = nowTime
+      }
+      setTimeout(() => {
+        this.trig()
+        this.#triggered = false
+      }, (offTime - nowTime) * 1000)
+    }
+
+    trig(freq) {
+      console.assert(false, "trig() must be implemented by subclass")
+    }
+  }
+
+  /**
    * Noise produces a playable buffer of noise.
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
