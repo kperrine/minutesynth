@@ -488,7 +488,7 @@ class MinuteSynth {
       P = P
       #autoMode = false
       #fGain
-      _calcSCRate = freq => freq * S * T
+      _calcSCRate = freq => freq * S
 
       constructor() {
         super(g)
@@ -510,7 +510,7 @@ class MinuteSynth {
       /**
        * on is called manually or by the Voice to engage a playback action.
        * Looping is automatically handled, assuming rate isn't changed mid-playback.
-       * @param {number} onTime - The time at which to start the play action; 0 for immmediate.
+       * @param {number | undefined} onTime - The time at which to start the play action; 0 for immmediate.
        * @param {number} freq - If specified, used to calculate the playback rate
        */
       on(onTime, freq) {
@@ -540,7 +540,7 @@ class MinuteSynth {
 
       /** 
        * off will cause the playback action to conclude (release).
-       * @param {number} offTime - The time at which to start the release action.
+       * @param {number | undefined} offTime - The time at which to start the release action.
        */
       off(offTime) {
         console.log(`Buffer off at: ${offTime}`)
@@ -987,7 +987,7 @@ class MinuteSynth {
   Freq({ p = 0, t$ } = {}) {
     const Module = class Freq extends this.BaseC {
       p = p
-      #prevFreq = 0
+      #prevFreq
 
       constructor() {
         super()
@@ -997,6 +997,8 @@ class MinuteSynth {
 
       /** 
        * on() is called manually or by the Voice to set the next frequency.
+       * @param {number | undefined} onTime - The time at which to set the frequency; 0 for immediate.
+       * @param {number} freq - The frequency to set
        */
       on(onTime, freq) {
         if (!onTime) {
@@ -1091,6 +1093,8 @@ class MinuteSynth {
 
       /**
        * This will call on() for all Modules registered.
+       * @param {number | undefined} onTime - The time at which to start the play action; 0 for immmediate.
+       * @param {number | undefined} freq - The frequency value to pass along with the triggering event
        */
       on(onTime, freq) {
         this.#modules.forEach(module => module.on && module.on(onTime, freq))
@@ -1098,6 +1102,7 @@ class MinuteSynth {
 
       /**
        * This will call off() for all Modules registered.
+       * @param {number | undefined} offTime - The time at which to start the release action; 0 for immmediate.
        */
       off(offTime) {
         this.#modules.forEach(module => module.off && module.off(offTime))

@@ -676,8 +676,8 @@ const ToneDefs = {
   },
   zzFx1: {
     fn: async function(m$) {
-      // Example of using Frank Force's ZzFx generation output as a source
-      // within the MinuteSynth framework. First, here is a copy of the
+      // Example of using Frank Force's ZzFx generation output as a buffered
+      // playback within the MinuteSynth framework. First, here is a copy of the
       // ZzFxMicro.min.js code that you would typically include in your HTML:
       // -----
       let // ZzFXMicro - Zuper Zmall Zound Zynth - v1.3.2 by Frank Force
@@ -702,7 +702,7 @@ const ToneDefs = {
       // allows me access to the generated buffer "k")
 
       // At this time, I'll set up my MinuteSynth stuff, but it can be done anywhere:
-      const tgtBuf = m$.Buf({ T: DUR_SECONDS, S: 1 / ZZ_FREQ, n: 1 })
+      const tgtBuf = m$.Buf({ T: DUR_SECONDS, S: 1 / ZZ_FREQ, n: ZZ_FREQ })
       const mem = tgtBuf.mem()
       const bufLen = Math.min(srcBuf.length, mem.length)
       for (let i = 0; i < bufLen; i++) {
