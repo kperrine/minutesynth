@@ -36,7 +36,7 @@ const ToneDefs = {
       // Here, we'll make our modules but not hook them up yet:
       const sinewave = m$.Osc({ t: m$.Waveforms.SINE }) // An always-on sine wave
       const squarewave = m$.Osc({ t: m$.Waveforms.SQUARE }) // An always-on square wave
-      const envelope = m$.ADSR({ p: 0.05, r: 1 }) // Will control tone emit and fadeout
+      const envelope = m$.ADSR({ r: 1 }) // Will control tone emit and fadeout
       const multResult = m$.Gain() // Multiples tones together for FM
       const voice = m$.Voice() // Output voice. Note that it has .f for frequency control.
 
@@ -44,8 +44,8 @@ const ToneDefs = {
       voice.f.$(sinewave.f) // Link voice frequency control to sine wave oscillator
       voice.$(envelope) // Allows the voice on/off to trigger the ADSR
       envelope.$(voice.g) // That then controls the voice's final gain
-      const fourFifthFreq = m$.Gain({ g: 0.98, r$: voice.f }) // Make detuned freq.
-      fourFifthFreq.$(squarewave.f) // Control the square wave oscillator
+      const offtuneFreq = m$.Gain({ g: 0.1, r$: voice.f }) // Make detuned freq.
+      offtuneFreq.$(squarewave.f) // Control the square wave oscillator
 
       // Now connect the audio routing of the modules:
       sinewave.$(multResult) // Connect sine wave to multiplier audio input
@@ -321,7 +321,7 @@ const ToneDefs = {
 
           // Make the voice:
           adsr = m$.ADSR({ D: 0, b: 0, e: 2, s: 1, a: 0.01, d: 0.3, r: 0.05, p: 0 }, voice)
-          osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: freqMod, S: 1/2, g: adsr }),
+          osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: freqMod, S: 1/4, g: adsr }),
 
           // Other stuff:
           noiseADSR = adsr = m$.ADSR({ D: 0.6, b: 0, e: 0.01, s: 0.1, a: 0.9, d: 0.1, r: 0.1, p: 0 }, voice),
@@ -689,7 +689,7 @@ const ToneDefs = {
 
       // Now, after including that stuff above, replace the AudioContext for buffering:
       const DUR_SECONDS = 1.1
-      const ZZ_FREQ = 220
+      const ZZ_FREQ = 440
       zzfxX = new OfflineAudioContext(1, ~~(m$.ac.sampleRate * DUR_SECONDS), m$.ac.sampleRate)
 
       // Run a ZzFx call that I made in https://killedbyapixel.github.io/ZzFX/
@@ -702,7 +702,7 @@ const ToneDefs = {
       // allows me access to the generated buffer "k")
 
       // At this time, I'll set up my MinuteSynth stuff, but it can be done anywhere:
-      const tgtBuf = m$.Buf({ T: DUR_SECONDS, S: 1 / ZZ_FREQ, n: ZZ_FREQ })
+      const tgtBuf = m$.Buf({ T: DUR_SECONDS, n: ZZ_FREQ })
       const mem = tgtBuf.mem()
       const bufLen = Math.min(srcBuf.length, mem.length)
       for (let i = 0; i < bufLen; i++) {

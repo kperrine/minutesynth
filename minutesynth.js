@@ -336,24 +336,27 @@ class MinuteSynth {
 
     /**
      * Boilerplate for a frequency-based parameter setup
-     * @param {AudioNode} control 
-     * @param {number | undefined} defFreq 
+     * @param {AudioNode} control - The AudioNode that will be controlled
+     * @param {number | AudioNode} defVal - The default value for the frequency
+     * @param {number | undefined} nomFreq - Nominal frequency
      */
-    _addFreqHelper(control, defFreq = 0) {
+    _addFreqHelper(control, defVal) {
       control.value = 0
       const gainModule = this.minuteSynth.Gain()
-      if (!isNaN(defFreq)) {
+      if (!isNaN(defVal)) {
         // If the default value is a number, then create a constant for it:
-        const freqC = this.minuteSynth.C(defFreq)
+        const freqC = this.minuteSynth.C(defVal)
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(new this.ParamValue('f', freqC.z.offset, defFreq))
+console.log(`Adding frequency helper with defVal ${defVal}`)
+        this._addParam(new this.ParamValue('f', freqC.z.offset, defVal))
         freqC.$(gainModule)
       }
       else {
         // TODO: Inherit the parameters rather than recreating.
-        this._addParam(new this.ParamValue('f', gainModule.z, defFreq))
+        this._addParam(new this.ParamValue('f', gainModule.z, defVal))
       }
-      this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate(1)))
+console.log(`Frequency helper rate: ${this._calcSCRate()}`)
+      this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate()))
       gainModule.z.connect(control)
       return gainModule
     }
@@ -439,10 +442,10 @@ class MinuteSynth {
    * @param {number | undefined} n - nominal playback frequncy (for custom waveform)
    * @returns {SynthModule} An instance of an oscillator module
    */
-  Osc({ t, S = 1, f, d, g = 1, s = 0, r, i, n = 1 }) {
+  Osc({ t, S = 1, f = 440, d, g = 1, s = 0, r, i, n = 1 }) {
     const Module = class Osc extends this.BaseAmp {
       o = this.minuteSynth.ac.createOscillator()
-      _calcSCRate = freq => freq * S / n
+      _calcSCRate = () => S / n
 
       constructor() {
         super(g)
@@ -472,7 +475,7 @@ class MinuteSynth {
    * @param {number | undefined} F - sampling rate (default: AudioContext's sample rate)
    * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
-   * @param {number | SynthModule | [] | undefined} n - nominal playback frequency (0 for no freq. control)
+   * @param {number | undefined} n - nominal playback frequency (0 for no freq. control)
    * @param {boolean | undefined} L - Enables looping if set to true
    * @param {number | undefined} p - Loop begin in seconds with respect to nominal frequency (default: 0)
    * @param {number | undefined} P - Loop end in seconds with respect to nominal frequency (default: end)
@@ -488,20 +491,21 @@ class MinuteSynth {
       P = P
       #autoMode = false
       #fGain
-      _calcSCRate = freq => freq * S
+      _calcSCRate = () => S / n
 
       constructor() {
         super(g)
         console.log(`Start parameter: ${s}`)
         this._addParam(new this.ParamStart(this.B, s))
         this._addParam(new this.ParamValue('d', this.B.detune, d))
+console.log(`BUF: Rate parameter: ${r}, nominal freq: ${n}`)
         if (n) {
           this.#fGain = this._addFreqHelper(this.B.playbackRate, n)
         }
         else {
           this._addParam(new this.ParamValue('r', this.B.playbackRate, r))
         }
-        this.#applyAttrs()
+        this.#applyAttrs(n)
         this._addParam(new this.ParamAudio(this, t$))
         this.B.buffer = this.b
         this.B.connect(this.z)
@@ -514,7 +518,6 @@ class MinuteSynth {
        * @param {number} freq - If specified, used to calculate the playback rate
        */
       on(onTime, freq) {
-        console.log(`Buffer on at ${onTime} with freq ${freq}`)
         const nowTime = this.minuteSynth.now()
         if (!onTime) {
           onTime = nowTime
@@ -522,13 +525,15 @@ class MinuteSynth {
         if (onTime < nowTime) {
           onTime = nowTime
         }
+        console.log(`Buffer on at ${onTime}${onTime == nowTime ? ' (now)' : ''} with freq ${freq}`)
         if (this.#autoMode) {
           // We are playing already. Must stop and refresh first.
+console.log(`Preemptive stop at: ${onTime}`)
           this.B.stop(onTime)
         }
         setTimeout(() => {
           if (this.#autoMode) {
-            this.renew()
+            this.renew(freq)
           }
           else {
             this.#applyAttrs(freq)
@@ -543,7 +548,6 @@ class MinuteSynth {
        * @param {number | undefined} offTime - The time at which to start the release action.
        */
       off(offTime) {
-        console.log(`Buffer off at: ${offTime}`)
         const nowTime = this.minuteSynth.now()
         if (offTime == null) {
           offTime = nowTime
@@ -551,6 +555,7 @@ class MinuteSynth {
         if (offTime < nowTime) {
           offTime = nowTime
         }
+        console.log(`Buffer off at: ${offTime}${offTime == nowTime ? ' (now)' : ''}`)
         if (!this.#autoMode) {
           // If we didn't start with an "on", then stop immediately.
           this.B.stop()
@@ -584,11 +589,11 @@ class MinuteSynth {
        * Renew will dereference the current BufferSource and attach a new one.
        * This is needed because the ending of a BufferSource renders it unusable.
        */
-      renew() {
+      renew(freq) {
         console.log('Renewing buffer source')
         this.#autoMode = false
         this.B = super.renew(this.B, this.minuteSynth.ac.createBufferSource())
-        this.#applyAttrs()
+        this.#applyAttrs(freq)
         if (this.#fGain) {
           this.#fGain.z.connect(this.B.playbackRate)
         }
@@ -756,7 +761,7 @@ class MinuteSynth {
   Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
     const module = class Filt extends this.BaseAmp {
       q = this.minuteSynth.ac.createBiquadFilter()
-      _calcSCRate = freq => freq * S
+      _calcSCRate = () => S
       constructor() {
         super(g)
         this.q.type = isNaN(t) ? t : ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
@@ -898,11 +903,11 @@ class MinuteSynth {
         }
         this.v.t(this.a.e, onTime + this.a.D, this.a.a / 3)
         this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
+        this.onTime = onTime
         if (this.a.p) {
-          this.onTime = null
+          //this.onTime = null
           this.off(onTime + this.a.p)
         }
-        this.onTime = onTime
       }
 
       /** 
@@ -1005,6 +1010,7 @@ class MinuteSynth {
           onTime = this.minuteSynth.now()
         }
         if (this.#prevFreq && this.p) {
+          // Portamento control:
           this.v.t(freq, onTime, this.p / 3)
         }
         else {
