@@ -378,19 +378,26 @@ console.log(`Frequency helper rate: ${this._calcSCRate()}`)
         }
       }
 
+console.log(`Param-level renew for ${node.constructor.name} in ${this.constructor.name}`)
       Object.values(this._params).forEach(param => {
         const key = getKeyByValue(node, param._obj)
         if (key) {
-          newNode[key].value = param._obj.value
+          let foundFlag = false
           param._inModules.forEach(module => {
             const inParam = module._outParams.find(p => p._obj === this._obj)
             if (inParam) {
+console.log(`Reconnecting Parameter ${inParam.name} via ${key}`)
+              if (!foundFlag) {
+                newNode[key].value = 0
+                foundFlag = true
+              }
               inParam._obj.connect(newNode[key])
             }
           })
           param._obj = newNode[key]
         }
         else if (param._obj === node) {
+console.log(`Reconnecting main audio input ${param.name}`)
           param._obj = newNode
         }
       })
@@ -533,6 +540,7 @@ console.log(`Preemptive stop at: ${onTime}`)
         }
         setTimeout(() => {
           if (this.#autoMode) {
+console.log('Auto-renewing')
             this.renew(freq)
           }
           else {
@@ -595,6 +603,7 @@ console.log(`Preemptive stop at: ${onTime}`)
         this.B = super.renew(this.B, this.minuteSynth.ac.createBufferSource())
         this.#applyAttrs(freq)
         if (this.#fGain) {
+          this.B.playbackRate.value = 0
           this.#fGain.z.connect(this.B.playbackRate)
         }
         this.B.buffer = this.b
