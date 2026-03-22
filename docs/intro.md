@@ -25,7 +25,7 @@ Most of the modules follow these patterns:
 * A module is created by calling a module name with a set of parameters:
   ```javascript
   // Create a sinewave with a fixed frequency of 600 Hz
-  const myOscillator = m$.Osc({ t: m$.Waveforms.SINE, f: 600 })
+  const myOscillator = m$.Osc({ t: m$.W.SINE, f: 600 })
   ```
   * Some parameters may be patchable, optionally able to receive upstream modules (`f:` in the example can do this), while other parameters are preset values that never change (e.g. `t:`).
 * Main audio patches between upstream and downstream modules can be made:
@@ -36,7 +36,7 @@ Most of the modules follow these patterns:
   destination.r$(source) // <-- Reverse patch
 
   // And, reverse-patch-upon-instantiation example:
-  const filter = m$.Filt({ t: m$.Filters.LOWPASS, q: 10, f: 300, r$: source })
+  const filter = m$.Filt({ t: m$.F.LOWPASS, q: 10, f: 300, r$: source })
   ```
 * There's often a built-in gain node that's controlled with the `g:` patchable parameter that's `1` (unity) by default, but set to `1/2` (or can use `0.5`) in these examples:
   ```javascript
@@ -58,8 +58,8 @@ Most of the modules follow these patterns:
   ```
 * Multiple patches are **added** together when an `[]` array is used:
   ```javascript
-  const sinewave = m$.Osc({ t: m$.Waveforms.SINE, f: 600 })
-  const squarewave = m$.Osc({ t: m$.Waveforms.SQUARE, f: 400 })
+  const sinewave = m$.Osc({ t: m$.W.SINE, f: 600 })
+  const squarewave = m$.Osc({ t: m$.W.SQUARE, f: 400 })
   voice.r$([sinewave, squarewave])
   ```
 * The `m$.Gain` module will **multiply** patches together:
@@ -70,10 +70,10 @@ Most of the modules follow these patterns:
 * Patchable parameters can take a constant number as an input, a module as an input, or an array of modules whose outputs are added together.
   ```javascript
   // Example 1: Set the gain to a constant value 1/2:
-  let sinewave = m$.Osc({ t: m$.Waveforms.SINE, f: 600, g: 1/2 })
+  let sinewave = m$.Osc({ t: m$.W.SINE, f: 600, g: 1/2 })
 
   // Example 2: Set the gain to a 3 Hz sinewave:
-  let sinewave = m$.Osc({ t: m$.Waveforms.SINE, f: 600, g: m$.Osc({ t: m$.sine, f: 3 }) })
+  let sinewave = m$.Osc({ t: m$.W.SINE, f: 600, g: m$.Osc({ t: m$.sine, f: 3 }) })
 
   // Example 3: both: adds 1/2 to the 3 Hz sinewave:
   let sinewave = m$.Osc({ t: 'sine', f: 600,
@@ -103,12 +103,12 @@ Most of the modules follow these patterns:
 
 Other esoteric details:
 
-* The "type" parameter `.t` on Oscillators and Filters (`m$.Osc` and `m$.Filt`) can take a string literal for the corresponding AudioNode (e.g. `'sine'`), take the MinuteSynth object convenience attribute (e.g. `m$.Waveforms.SINE`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Reference](reference.md#osc-oscillator) for more info.
+* The "type" parameter `.t` on oscillators and filters (`m$.Osc` and `m$.Filt`) can take a string literal for the corresponding AudioNode (e.g. `'sine'`), take the MinuteSynth object convenience attribute (e.g. `m$.W.SINE`), or be substituted with a number (e.g. `1`) that maps into a lookup table found in the MinuteSynth code. See the [Reference](reference.md#osc-oscillator) for more info.
   ```javascript
   // String:
   let sinewave = m$.Osc({ t: 'sine', f: 100, g: 1/4 })
   // Convenience attribute:
-  let sinewave = m$.Osc({ t: m$.Waveforms.SINE, f: 100, g: 1/4 })
+  let sinewave = m$.Osc({ t: m$.W.SINE, f: 100, g: 1/4 })
   // Shorthand number:
   let sinewave = m$.Osc({ t: 1, f: 100, g: 1/4 })
   ```
@@ -119,7 +119,7 @@ Other esoteric details:
 * If you want to route the output of a MinuteSynth module to a WebAudio node input, you can use `.$()` on the module:
   ```javascript
   // Let's say we have an "analyser" object from WebAudio.
-  let myOscillator = m$.Osc({ t: m$.Waveforms.SINE, f: 30 })
+  let myOscillator = m$.Osc({ t: m$.W.SINE, f: 30 })
   myOscillator.$(analyser)
   ...
   myOscillator.detach() // <-- Will work

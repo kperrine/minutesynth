@@ -145,14 +145,14 @@ The `t` "type" parameter must take one of the following:
  
 | Attribute | Index | WebAudio String |
 |-|-|-|
-| m$.Filters.LOWPASS | 1 | 'lowpass' |
-| m$.Filters.HIGHPASS | 2 | 'highpass' |
-| m$.Filters.BANDPASS | 3 | 'bandpass' |
-| m$.Filters.LOWSHELF | 4 | 'lowshelf' |
-| m$.Filters.HIGHSHELF | 5 | 'highshelf' |
-| m$.Filters.PEAKING | 6 | 'peaking' |
-| m$.Filters.NOTCH | 7 | 'notch' |
-| m$.Filters.ALLPASS | 8 | 'allpass' |
+| m$.F.LOWPASS | 1 | 'lowpass' |
+| m$.F.HIGHPASS | 2 | 'highpass' |
+| m$.F.BANDPASS | 3 | 'bandpass' |
+| m$.F.LOWSHELF | 4 | 'lowshelf' |
+| m$.F.HIGHSHELF | 5 | 'highshelf' |
+| m$.F.PEAKING | 6 | 'peaking' |
+| m$.F.NOTCH | 7 | 'notch' |
+| m$.F.ALLPASS | 8 | 'allpass' |
 
 ---
 
@@ -204,11 +204,11 @@ The type `t:` parameter must take one of these values:
 
 | Attribute | Index | WebAudio String |
 |-|-|-|
-| m$.Waveforms.SINE | 1 | 'sine' |
-| m$.Waveforms.SQUARE | 2 | 'square' |
-| m$.Waveforms.SAWTOOTH | 3 | 'sawtooth' |
-| m$.Waveforms.TRIANGLE | 4 | 'triangle' |
-| m$.Waveforms.CUSTOM | 5 | 'custom' |
+| m$.W.SINE | 1 | 'sine' |
+| m$.W.SQUARE | 2 | 'square' |
+| m$.W.SAWTOOTH | 3 | 'sawtooth' |
+| m$.W.TRIANGLE | 4 | 'triangle' |
+| m$.W.CUSTOM | 5 | 'custom' |
 
 The start `s:` parameter may take:
 

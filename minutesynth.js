@@ -432,7 +432,7 @@ console.log(`Reconnecting main audio input ${param.name}`)
   /**
    * Convenience/clarity constants for Osc t: type
    */
-  Waveforms = Object.freeze({
+  W = Object.freeze({
     SINE: 1,
     SQUARE: 2,
     SAWTOOTH: 3,
@@ -444,7 +444,7 @@ console.log(`Reconnecting main audio input ${param.name}`)
    * Osc (Oscillaor) is a simple tone generator. Specify its type and also
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
-   * @param {number | string} t - Type of waveform, can use Waveforms lookup
+   * @param {number | string} t - Type of waveform, can use W lookup
    * @param {number | undefined} S - scale (default: 1)
    * @param {number | SynthModule | []} f - default frequency
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
@@ -750,7 +750,7 @@ console.log('Auto-renewing')
   /**
    * Convenience/clarity constants for Filt t: type
    */
-  Filters = Object.freeze({
+  F = Object.freeze({
     LOWPASS: 1,
     HIGHPASS: 2,
     BANDPASS: 3,
@@ -763,7 +763,7 @@ console.log('Auto-renewing')
 
   /**
    * Filt (Filter) allows for filtering of sound using the filter type provided in t.
-   * @param {number | string} t - Type of filter, can use Filters lookup
+   * @param {number | string} t - Type of filter, can use F lookup
    * @param {number | SynthModule | []} q - Q value
    * @param {number | SynthModule | []} f - frequency
    * @param {number | undefined} S - scale (default: 1)

@@ -21,7 +21,7 @@ const ToneDefs = {
       const adsr = m$.ADSR({ a: 0.2, d: 0.5, s: 0.3, r: 2 }, voice)
       
       // Finish up, using the Voice's frequency generator attribute:
-      const osc = m$.Osc({ t: m$.Waveforms.SQUARE, f: voice.f, g: adsr })
+      const osc = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr })
       osc.$(voice)
 
       return voice
@@ -34,8 +34,8 @@ const ToneDefs = {
     fn: m$ => {
       // Demonstrates FM synthesis
       // Here, we'll make our modules but not hook them up yet:
-      const sinewave = m$.Osc({ t: m$.Waveforms.SINE }) // An always-on sine wave
-      const squarewave = m$.Osc({ t: m$.Waveforms.SQUARE }) // An always-on square wave
+      const sinewave = m$.Osc({ t: m$.W.SINE }) // An always-on sine wave
+      const squarewave = m$.Osc({ t: m$.W.SQUARE }) // An always-on square wave
       const envelope = m$.ADSR({ r: 1 }) // Will control tone emit and fadeout
       const multResult = m$.Gain() // Multiples tones together for FM
       const voice = m$.Voice() // Output voice. Note that it has .f for frequency control.
@@ -63,7 +63,7 @@ const ToneDefs = {
     fn: m$ => {
       var voice = m$.Voice(),
           noise = m$.Noise(),
-          filter = m$.Filt({ t: m$.Filters.BANDPASS, q: 10, f: voice.f }),
+          filter = m$.Filt({ t: m$.F.BANDPASS, q: 10, f: voice.f }),
           adsr = m$.ADSR({ s: 3 }, voice) // Default on/off, triggered
       noise.$(filter)
       filter.$(voice)
@@ -78,7 +78,7 @@ const ToneDefs = {
     fn: m$ => {
       var voice = m$.Voice(),
           adsr = m$.ADSR({}, voice), // Default on/off, triggered
-          osc = m$.Osc({ t: m$.Waveforms.SQUARE, f: voice.f, g: adsr }),
+          osc = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr }),
           reverb = m$.Conv({ b: m$.reverb(0, 2, 0.95), r$: osc })
       reverb.$(voice)
       return voice
@@ -92,11 +92,11 @@ const ToneDefs = {
       // Resonance demo. Play at Octave 1 or 2
       let voice = m$.Voice(),
           adsr = m$.ADSR({}, voice), // Basic on/off
-          osc1 = m$.Osc({ t: m$.Waveforms.SQUARE, f: voice.f, g: adsr }),
-          osc2 = m$.Osc({ t: m$.Waveforms.TRIANGLE, f: voice.f, S: 1/2, g: adsr }),
+          osc1 = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr }),
+          osc2 = m$.Osc({ t: m$.W.TRIANGLE, f: voice.f, S: 1/2, g: adsr }),
       // Get a lowpass filter with high Q value to dip from 1000 to 150 then back to 2500:
       sweeper = m$.ADSR({ b: 1000, e: 150, s: 2500, a: 1.5, d: 8, r: 0.5 }, voice),
-      lpFilter = m$.Filt({ t: m$.Filters.LOWPASS, q: 18, f: sweeper, g: 1/4 })
+      lpFilter = m$.Filt({ t: m$.F.LOWPASS, q: 18, f: sweeper, g: 1/4 })
       // Link square wave to our filter and then out to voice:
       lpFilter.r$([osc1, osc2])
       voice.r$(lpFilter)
@@ -111,10 +111,10 @@ const ToneDefs = {
       // Bandpass filter sweeping up, using an ADSR
       let voice = m$.Voice(),
           adsr = m$.ADSR({}, voice), // Basic on/off
-          squareWave = m$.Osc({ t: m$.Waveforms.SQUARE, f: voice.f, g: adsr }),
+          squareWave = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr }),
           // Go from 30 to 2000 Hz in 1 sec.:
           sweeper = m$.ADSR({ b: 30, e: 2000, s: 2000, a: 1, r: 0.5 }, voice),
-          bpFilter = m$.Filt({ t: m$.Filters.BANDPASS, q: 5, f: sweeper })
+          bpFilter = m$.Filt({ t: m$.F.BANDPASS, q: 5, f: sweeper })
       // Link square wave to our filter and then out to voice:
       squareWave.$(bpFilter).$(voice)
       return voice
@@ -131,7 +131,7 @@ const ToneDefs = {
       const AMOUNT = 50 // We'll calculate this Hz +/- AMOUNT at 440
       let voice = m$.Voice(),
           // Here's our LFO, oscillating from -1 to 1:
-          lfo = m$.Osc({ t: m$.Waveforms.SINE, f: FREQ }),
+          lfo = m$.Osc({ t: m$.W.SINE, f: FREQ }),
 
           // We want the vibrato amplitude to be proportional to frequency.
           factor = m$.Gain({ g: AMOUNT / 440, r$: voice.f }),
@@ -139,7 +139,7 @@ const ToneDefs = {
 
           adsr = m$.ADSR({}, voice), // Basic on/off
           // Add our scaled LFO to the voice frequency:
-          triWave = m$.Osc({ t: m$.Waveforms.TRIANGLE, f: [voice.f, lfoScaled], g: adsr })
+          triWave = m$.Osc({ t: m$.W.TRIANGLE, f: [voice.f, lfoScaled], g: adsr })
 
       triWave.$(voice)
       return voice
@@ -153,7 +153,7 @@ const ToneDefs = {
       // Demonstration using a frequency controller to create a "sliding" effect
       let voice = m$.Voice(),
           adsr = m$.ADSR({}, voice),
-          osc1 = m$.Osc({ t: m$.Waveforms.TRIANGLE, f: voice.f, g: adsr })
+          osc1 = m$.Osc({ t: m$.W.TRIANGLE, f: voice.f, g: adsr })
       voice.f.p = 1/2 // Set portamento to be a half-second
       osc1.$(voice)
       return voice
@@ -251,13 +251,13 @@ const ToneDefs = {
       const voice = m$.Voice()
       const slide1 = m$.ADSR({ a: 2, b: 146, e: 78, s: 390, r: 1 }, voice)
       const adsr = m$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
-      const osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: slide1, S: 1/2, g: adsr })
+      const osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1/2, g: adsr })
       const noiseADSR = m$.ADSR({ D: 0.4, b: 0, e: 0.01, s: 0.05, a: 1, d: 0.1, r: 0.1, p: 0 }, voice)
       const noise = m$.Noise({ g: noiseADSR })
       const distort = m$.Dist({ a: 4, r$: [osc1, noise], g: 4 })
       const filterADSR = m$.ADSR({ D: 0.01, b: 2000, e: 50, s: 3200, a: 0.4, d: 0.1, r: 0.5, p: 0 }, voice)
   
-      const filter = m$.Filt({ t: m$.Filters.HIGHPASS, f: filterADSR, q: 10, g: 0.65, r$: distort })
+      const filter = m$.Filt({ t: m$.F.HIGHPASS, f: filterADSR, q: 10, g: 0.65, r$: distort })
       const compress = m$.Comp({ g: 4, k: 4, r$: filter })
   
       compress.$(voice)
@@ -274,11 +274,11 @@ const ToneDefs = {
       const voice = m$.Voice()
       const slide1 = m$.ADSR({ a: 2, b: 146, e: 0.73, s: 1, r: 1 }, voice)
       const adsr = m$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
-      const osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: slide1, S: 1/2, g: adsr })
+      const osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1/2, g: adsr })
       const distort = m$.Dist({ a: 55, r$: osc1, g: 1 })
       const filterADSR = m$.ADSR({ D: 0.01, b: 1000, e: 100, s: 1000, a: 0.21, d: 0.1, r: 0.9, p: 0 }, voice) // change s for fun
 
-      const filter = m$.Filt({ t: m$.Filters.HIGHPASS, f: filterADSR, q: 8, g: 0.65, r$: distort })
+      const filter = m$.Filt({ t: m$.F.HIGHPASS, f: filterADSR, q: 8, g: 0.65, r$: distort })
       const compress = m$.Comp({ g: 4, k: 4, r$: filter })
 
       compress.$(voice)
@@ -321,12 +321,12 @@ const ToneDefs = {
 
           // Make the voice:
           adsr = m$.ADSR({ D: 0, b: 0, e: 2, s: 1, a: 0.01, d: 0.3, r: 0.05, p: 0 }, voice)
-          osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: freqMod, S: 1/4, g: adsr }),
+          osc1 = m$.Osc({ t: m$.W.SINE, f: freqMod, S: 1/4, g: adsr }),
 
           // Other stuff:
           noiseADSR = adsr = m$.ADSR({ D: 0.6, b: 0, e: 0.01, s: 0.1, a: 0.9, d: 0.1, r: 0.1, p: 0 }, voice),
           noise = m$.Noise({ g: noiseADSR }),
-          filter = m$.Filt({ t: m$.Filters.LOWPASS, f: 2800, q: 2, g: 1, r$: [osc1, noise] }),
+          filter = m$.Filt({ t: m$.F.LOWPASS, f: 2800, q: 2, g: 1, r$: [osc1, noise] }),
           distort = m$.Dist({ a: 30, r$: filter, g: 1 }), // a = distort amount
           compress = m$.Comp({ k: 8, r$: distort })
 
@@ -361,7 +361,7 @@ const ToneDefs = {
       const voice = m$.Voice(),
             adsr = m$.ADSR({ a: 0.0001, d: 0.02, s: 0 }, voice),
             noise = m$.Noise({ g: adsr }),
-            filter = m$.Filt({ t: m$.Filters.BANDPASS, q: 0.8, f: 2000, r$: noise, g: 2 })
+            filter = m$.Filt({ t: m$.F.BANDPASS, q: 0.8, f: 2000, r$: noise, g: 2 })
               // Bring down f to your liking
       filter.$(voice)
       return voice
@@ -374,9 +374,9 @@ const ToneDefs = {
     fn: m$ => {
       // NOTE: Currently does not respond to Voice frequency input.
       const voice = m$.Voice(),
-            osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: 50 }),
+            osc1 = m$.Osc({ t: m$.W.SINE, f: 50 }),
             distorter = m$.Dist({ a: 30, r$: osc1 }),
-            filter = m$.Filt({ t: m$.Filters.HIGHPASS, q: 0.5, f: 3000, r$: distorter }),
+            filter = m$.Filt({ t: m$.F.HIGHPASS, q: 0.5, f: 3000, r$: distorter }),
               // Bring down f to your liking
             compressor = m$.Comp({ k: 0.5, g: 5, r$: filter }),
             reverb = m$.Conv({ b: m$.reverb(0.1, 1, 0.95), r$: compressor, g: 2 })
@@ -434,7 +434,7 @@ const ToneDefs = {
       const voice = m$.Voice(),
             slide1 = m$.ADSR({ a: 0.2, b: 5000, e: 220, s: 1, r: 0.1 }, voice),
             adsr = m$.ADSR({ D: 0, b: 0, e: 1, s: 1.8, a: 1, d: 1, r: 0.1, p: 0.1 }, voice),
-            osc1 = m$.Osc({ t: m$.Waveforms.SINE, f: slide1, S: 1, g: adsr }),
+            osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1, g: adsr }),
             compress = m$.Comp({ g: 1, k: 4, r$: osc1 })
       compress.$(voice)
       return voice
@@ -446,11 +446,11 @@ const ToneDefs = {
   chip: {
     fn: m$ => {
       let voice = m$.Voice({ g: 0.7 }),
-          tone1 = m$.Osc({ t: m$.Waveforms.TRIANGLE, S: 1/2, g: 0.5 }),
+          tone1 = m$.Osc({ t: m$.W.TRIANGLE, S: 1/2, g: 0.5 }),
           tone2 = m$.Pulse({ w: 2/16, o: 5/16, S: 1/2, g: 0.75 }),
           fADSR = m$.ADSR({ b: 2000, a: 0.1, e: 4000, d: 3, s: 2000, r: 4 }, voice),
-          highpass = m$.Filt({ t: m$.Filters.HIGHPASS, q: 4, f: fADSR, r$: [tone1, tone2] }),
-          lowpass = m$.Filt({ t: m$.Filters.LOWPASS, q: 0.2, f: 4000, r$: highpass }),
+          highpass = m$.Filt({ t: m$.F.HIGHPASS, q: 4, f: fADSR, r$: [tone1, tone2] }),
+          lowpass = m$.Filt({ t: m$.F.LOWPASS, q: 0.2, f: 4000, r$: highpass }),
           ampADSR = m$.ADSR({ d: 3, s: 0.8, r: 0.1 }, voice),
           amp = m$.Gain({ g: ampADSR, r$: [tone1, tone2, lowpass] });
       voice.f.$(tone1.f)
@@ -467,9 +467,9 @@ const ToneDefs = {
       // NOTE: Currently does not respond to Voice frequency input.
       let fundamental = 40, // (Change to 800 for clanging sound)
           ratios = [2, 3, 4.16, 5.43, 6.79, 8.21],
-          bandFilter = m$.Filt({ t: m$.Filters.BANDPASS, q: 1, f: 10000 }),
-          hiFilter = m$.Filt({ t: m$.Filters.HIGHPASS, q: 1, f: 7000, r$: bandFilter })
-      ratios.forEach(ratio => m$.Osc({ t: m$.Waveforms.SQUARE, f: ratio * fundamental }).$(bandFilter))
+          bandFilter = m$.Filt({ t: m$.F.BANDPASS, q: 1, f: 10000 }),
+          hiFilter = m$.Filt({ t: m$.F.HIGHPASS, q: 1, f: 7000, r$: bandFilter })
+      ratios.forEach(ratio => m$.Osc({ t: m$.W.SQUARE, f: ratio * fundamental }).$(bandFilter))
       let voice = m$.Voice({ g: .5, r$: hiFilter })
       let adsrMod = m$.ADSR({ a: 0.01, e: 4, d: 0.05, s: 0 }, voice)
       adsrMod.$(hiFilter.g)
@@ -514,12 +514,12 @@ const ToneDefs = {
       // NOTE: Currently does not respond to Voice frequency input.
       let noise = m$.Noise(),
           lfADSR = m$.ADSR({ b: 8000, a: 0.15, e: 5, d: 1, s: 400 }),
-          lowFilter = m$.Filt({ t: m$.Filters.LOWPASS, q: 1, f: lfADSR, g: 1, r$: noise }),
+          lowFilter = m$.Filt({ t: m$.F.LOWPASS, q: 1, f: lfADSR, g: 1, r$: noise }),
           outGain = m$.Gain({ r$: lowFilter }),
           fADSR = m$.ADSR({ a: 0.7, e: 100 }),
           aADSR0 = m$.ADSR({ d: 0.3, s: 0 }),
           aADSR = m$.ADSR({ d: 0.5, e: 0.2, s: 0.8 }),
-          filter = m$.Filt({ t: m$.Filters.BANDPASS, q: 100, f: 25, r$: noise })
+          filter = m$.Filt({ t: m$.F.BANDPASS, q: 100, f: 25, r$: noise })
       aADSR0.$(filter.g)
       filter.$(outGain)
       let voice = m$.Voice({ g: 1, r$: outGain })
@@ -555,12 +555,12 @@ const ToneDefs = {
     fn: m$ => {
       // Created by 7r1x/neuralyte
       let voice = m$.Voice(),
-          carrier = m$.Osc({ t: m$.Waveforms.TRIANGLE, f: voice.f, S: 1/8, g: 1/4 }),
+          carrier = m$.Osc({ t: m$.W.TRIANGLE, f: voice.f, S: 1/8, g: 1/4 }),
           fMult = m$.Gain({ g: voice.f, r$: carrier }),
-          modulator = m$.Osc({ t: m$.Waveforms.SINE, f: [voice.f, fMult], g: 1/2, S: 1/2 }),
+          modulator = m$.Osc({ t: m$.W.SINE, f: [voice.f, fMult], g: 1/2, S: 1/2 }),
           fADSR = m$.ADSR({ b: 0.05, a: 0.5, e: .4, d: 1, s: 0.5, r: 0.2 }, voice),
           fADSRMult = m$.Gain({ g: voice.f, r$: fADSR }),
-          filter = m$.Filt({ t: m$.Filters.LOWPASS, q: 1, f: fADSRMult, r$: modulator }),
+          filter = m$.Filt({ t: m$.F.LOWPASS, q: 1, f: fADSRMult, r$: modulator }),
           distorter = m$.Dist({ a: 15, r$: filter }),
           loud = m$.Gain({ g: 3, r$: distorter })
       loud.$(voice)
@@ -578,10 +578,10 @@ const ToneDefs = {
           ratios = [2, 3, 4.16, 5.43, 6.79, 8.21],
           fADSR1 = m$.ADSR({ a: 0.05, b: 2000, e: 10000, d: 0, s: 10000 }),
           fADSR2 = m$.ADSR({ a: 0.1, b: 200, e: 10000, d: 1, s: 5000 }),
-          bandFilter = m$.Filt({ t: m$.Filters.BANDPASS, q: 0.02, f: fADSR1 }),
-          hiFilter = m$.Filt({ t: m$.Filters.HIGHPASS, q: 0.02, f: fADSR2, r$: bandFilter }),
+          bandFilter = m$.Filt({ t: m$.F.BANDPASS, q: 0.02, f: fADSR1 }),
+          hiFilter = m$.Filt({ t: m$.F.HIGHPASS, q: 0.02, f: fADSR2, r$: bandFilter }),
           reverb = m$.Conv({ b: m$.reverb(0, 0.5, 0), n: true, g: 10, r$: hiFilter })
-      ratios.forEach(ratio => m$.Noise().$(m$.Filt({ t: m$.Filters.BANDPASS, f: ratio * fundamental, q: 0.2, g: 3 }).$(bandFilter)))
+      ratios.forEach(ratio => m$.Noise().$(m$.Filt({ t: m$.F.BANDPASS, f: ratio * fundamental, q: 0.2, g: 3 }).$(bandFilter)))
       let voice = m$.Voice({ g: 0.3, r$: reverb }),
           adsrMod = m$.ADSR({ a: 0.01, d: 1, s: 0 }, voice)
       adsrMod.$(hiFilter.g)
@@ -646,7 +646,7 @@ const ToneDefs = {
       const adjFreq = m$.Gain({ r$: program, g: voice.f })
 
       // Next, tone generation, etc.
-      const tone = m$.Osc({ t: m$.Waveforms.TRIANGLE, f: adjFreq, g: 0.5 })
+      const tone = m$.Osc({ t: m$.W.TRIANGLE, f: adjFreq, g: 0.5 })
       const adsr = m$.ADSR({ d: 5, s: 0 }, voice) // Quick onset, slow decay
       const amp = m$.Gain({ r$: tone, g: adsr })
       amp.$(voice) // Plug amp output into voice
@@ -663,11 +663,11 @@ const ToneDefs = {
       const amp = m$.Gain()
       for (let i = 0; i < 20; i++) {
         // TODO: Put in a mathy way of producing freqs deterministically, likely involving a modulo:
-        let osc = m$.Osc({ t: m$.Waveforms.SAWTOOTH, f: Math.random() * 1170 + 30, g: Math.random() * 0.2 + 0.1 })
+        let osc = m$.Osc({ t: m$.W.SAWTOOTH, f: Math.random() * 1170 + 30, g: Math.random() * 0.2 + 0.1 })
         osc.$(amp)
       }
       const adsr = m$.ADSR({ b: 100, a: 8, e: 800, s: 1000, d: 6 }, voice)
-      const filter = m$.Filt({ t: m$.Filters.BANDPASS, q: 10, f: adsr, S: 2, g: 3, r$: amp })
+      const filter = m$.Filt({ t: m$.F.BANDPASS, q: 10, f: adsr, S: 2, g: 3, r$: amp })
       const finalAmp = m$.Gain({ g: m$.ADSR({ b: 0.1, a: 6 }, voice), r$: filter })
       finalAmp.$(voice)
       return voice
