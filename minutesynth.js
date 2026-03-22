@@ -82,6 +82,12 @@ class MinuteSynth {
 
     /** Represents a parameter that allows for attachment to another module or constant as input */
     Param = (parent => class Param {
+      /** @type {string} */
+      name
+
+      /** @type {AudioParam | AudioNode} */
+      obj
+
       /** @type {SynthModule[]} */
       _inModules
 
@@ -91,12 +97,12 @@ class MinuteSynth {
       /**
        * Cretes a parameter that allows for attachment to another module
        * @param {string} name
-       * @param {AudioParam} obj
+       * @param {AudioParam | AudioNode} obj
        * @param {number | string} defVal 
        */
       constructor(name, obj, defVal) {
         this.name = name
-        this._obj = obj
+        this.obj = obj
         this._defVal = defVal
         this._inModules = []
       }
@@ -113,7 +119,7 @@ class MinuteSynth {
             module = this.synthModule.minuteSynth.C(module)
           }
           this._inModules.push(module)
-          if (module._$(this._obj)) {
+          if (module._$(this.obj)) {
             this.z0 && this.z0()
           }
         }
@@ -127,7 +133,7 @@ class MinuteSynth {
       detach(inModule) {
         for (let module of [...this._inModules]) { // Iterate over copy
           if (!inModule || (module === inModule)) {
-            [].concat(this._obj).forEach(obj => {
+            [].concat(this.obj).forEach(obj => {
               try {
                 module.z.disconnect(obj)
               } catch (_) {}})
@@ -149,35 +155,35 @@ class MinuteSynth {
       }
 
       vC(value) {
-        this._obj.value = value
+        this.obj.value = value
       }
 
       vT(value, startTime) {
-        this._obj.setValueAtTime(value, startTime)
+        this.obj.setValueAtTime(value, startTime)
       }
 
       lT(value, endTime) {
-        this._obj.linearRampToValueAtTime(value, endTime)
+        this.obj.linearRampToValueAtTime(value, endTime)
       }
 
       eT(value, endTime) {
-        this._obj.exponentialRampToValueAtTime((Math.abs(value) < 1e-4) ? 1e-4 : value, endTime)
+        this.obj.exponentialRampToValueAtTime((Math.abs(value) < 1e-4) ? 1e-4 : value, endTime)
       }
 
       t(value, startTime, tc) { // tc: Use 1/3 for 95% over 1 sec.
-        this._obj.setTargetAtTime(value, startTime, tc)
+        this.obj.setTargetAtTime(value, startTime, tc)
       }
       
       cv(values, startTime, dur) {
-        this._obj.setValueCurveAtTime(values, startTime, dur)
+        this.obj.setValueCurveAtTime(values, startTime, dur)
       }
       
       c(startTime) {
-        this._obj.cancelScheduledValues(startTime)
+        this.obj.cancelScheduledValues(startTime)
       }
 
       h(holdTime) {
-        this._obj.cancelAndHoldAtTime(holdTime)
+        this.obj.cancelAndHoldAtTime(holdTime)
       }
 
       z0() {
@@ -197,7 +203,7 @@ class MinuteSynth {
       }
 
       z0() {
-        this._obj.value = 0
+        this.obj.value = 0
       }
     }
 
@@ -224,7 +230,7 @@ class MinuteSynth {
        */
       go(startTime = 0) {
         console.log(`Start time: ${startTime}`)
-        this._obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
+        this.obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
       }
 
       /**
@@ -233,7 +239,7 @@ class MinuteSynth {
        */
       stop(stopTime = 0) {
         console.log(`Stop time: ${stopTime}`)
-        this._obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
+        this.obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
         // TODO: Consider scheduling an object detach() at stopTime
       }
     }
@@ -380,25 +386,25 @@ console.log(`Frequency helper rate: ${this._calcSCRate()}`)
 
 console.log(`Param-level renew for ${node.constructor.name} in ${this.constructor.name}`)
       Object.values(this._params).forEach(param => {
-        const key = getKeyByValue(node, param._obj)
+        const key = getKeyByValue(node, param.obj)
         if (key) {
           let foundFlag = false
           param._inModules.forEach(module => {
-            const inParam = module._outParams.find(p => p._obj === this._obj)
+            const inParam = module._outParams.find(p => p.obj === this.obj)
             if (inParam) {
 console.log(`Reconnecting Parameter ${inParam.name} via ${key}`)
               if (!foundFlag) {
                 newNode[key].value = 0
                 foundFlag = true
               }
-              inParam._obj.connect(newNode[key])
+              inParam.obj.connect(newNode[key])
             }
           })
-          param._obj = newNode[key]
+          param.obj = newNode[key]
         }
-        else if (param._obj === node) {
+        else if (param.obj === node) {
 console.log(`Reconnecting main audio input ${param.name}`)
-          param._obj = newNode
+          param.obj = newNode
         }
       })
       return newNode

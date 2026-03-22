@@ -20,10 +20,11 @@ This is a reference for the MinuteSynth wrapper library for WebAudio found in mo
   - [Pulse](#pulse)
   - [Spec (Spectrum)](#spec-spectrum)
   - [Voice](#voice)
+  - [Special AudioNode Adaptor](#special-audionode-adaptor)
   - [Others TODO](#others-todo)
 - [Common Method Reference](#common-method-reference)
   - [All Modules](#all-modules)
-  - [Patchable Parameters](#patchable-parameters)
+  - [Patchable Parameter Objects](#patchable-parameter-objects)
 - [Additional Utility Methods](#additional-utility-methods)
 
 ## Inclusion
@@ -78,9 +79,9 @@ ADSR parameters (see the [Intro docs](intro.md#adsr-controls) for a diagram that
 
 `Buf({ T: 1, c: 1, S: 1, g: 1, s: -1, F: AudioContext.samplerate, r: 1, d, n: 0, L, p, P }, t$)`
 
-Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is the returned buffer's `.length`. See additional notes on `Buf` further below.
+Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is the returned buffer's `.length`. Direct edits to the memory can be immediately heard. If using frequency control, this module automatically refreshes the underlying WebAudio `AudioBufferSource` so that repeated playing is possible.
 
-Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1`, `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate; `d:` detune; `n:` nominal playback frequency via the `.f` property (0 for no freq. control), `L:` enables looping if true, `p:` loop begin in seconds with respect to nominal frequence (default: 0), and `P:` loop end (default: end).
+Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1` (default), `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate factor; `d:` detune; `n:` nominal playback frequency via the `.f` property (0 for no freq. control), `L:` enables looping if true, `p:` loop begin in seconds with respect to nominal frequency (default: 0), and `P:` loop end (default: end).
 
 Pass in `t$` from a trigger source to trigger the buffer's playback.
 
@@ -185,7 +186,7 @@ Params: `g:` gain value; `r$:` input
 
 Noise produces a playable buffer of noise.
 
-Params: `g:` gain; `s:` start time (non-patchable), `r:` playback rate, `d:` detune
+Params: `g:` gain; `s:` start time (non-patchable), `r:` playback rate factor, `d:` detune
 
 ---
 
@@ -275,6 +276,16 @@ Methods:
 
 ---
 
+### Special AudioNode Adaptor
+
+**`ACN(N, r$)`**
+
+ACN is a wrapper for an arbitrary AudioNode, to facilitate connection tracking and parameter manipulation offered through this framework.
+
+Specify an instantiated AudioNode object in `N`, with optional ability for reverse-binding via `r$`.
+
+---
+
 ### Others TODO
 
 * Channel split
@@ -286,17 +297,23 @@ Methods:
 
 ### All Modules
 
-**`.$(target)`:** Forward-patch: Patches the default output of the module this is called on to the default input of the `target` module or patchable parameter.
+**`.$(target)`:** Forward-patch: Patches the default output of the module this is called on to the default input of the `target` module or patchable parameter. Returns `target` to allow chaining.
 
-**`.r$(source)`:** Reverse-patch: Acts in the reverse direction of the `.$()` method; allows for the default output of the `source` module or patchable parameter to be patched to the default input of this module or patchable parameter. In addition:
+**`.r$(source)`:** Reverse-patch: Acts in the reverse direction of the `.$()` method; allows for the default output of the `source` module or patchable parameter to be patched to the default input of this module or patchable parameter. Return self to allow chaining. In addition:
 
-* When called with an array as a parameter, all patches are added together.
-* When called repeatedly, all patches are added together.
+* When called with an array as a parameter, all patches or values in the array are added together.
+* When called repeatedly or chained, all patches or values are added together.
 * Direct numbers may be specified to patch a constant value. They'll automatically be wrapped in a `m$.C` module.
 
 **`.detach(tgtModule, paramName)`:** Explicitly disconnects the underlying AudioNode objects. It will stop sound, and it will also facilitate garbage collection of WebAudio objects. If parameters aren't specified, then the notion of "ALL" is assumed.
 
-### Patchable Parameters
+**`.z` Attribute:** Directly references the underlying WebAudio AudioNode that drives the main audio output for the module. Note that connections made directly to or from this attribute are not tracked within this framework, as they would otherwise be with `.$()` and `.r$()`.
+
+### Patchable Parameter Objects
+
+**`.name`:** String name representation for the parameter
+
+**`.obj`:** Direct reference to the destination WebAudio AudioNode or AudioParam object
 
 **`.r$(source)`:** Reverse-patch: Same operation as `.r$()` for modules.
 
