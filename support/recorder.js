@@ -1,12 +1,12 @@
 "use strict";
 
-function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, noteOff, callback) {
+async function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, noteOff, callback) {
   console.log('Beginning rendering.')
   var R = sampleRate
   let oac = new OfflineAudioContext(1, ~~(R * dur), R)
-  let synth = MinuteSynth(oac)
+  let synth = new MinuteSynth(oac)
 
-  let voice = voiceFunc(synth)
+  let voice = await voiceFunc(synth)
   let now = synth.now()
   voice.off(now)
   voice.on(now, noteFreq)
@@ -35,7 +35,7 @@ function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, not
   
 function _makeLink(samples, voiceName, buf, sampleRate, dur) {
   // Provide buffer for playback and play it:
-  let playBuf = synthInst.ac.createBuffer(1, ~~(sampleRate * dur), 27928/*sampleRate*/)
+  let playBuf = synthInst.ac.createBuffer(1, ~~(sampleRate * dur), sampleRate)
   let srcData = buf.getChannelData(0)
   let data = playBuf.getChannelData(0)
   for (let i = 0; i < data.length; i++) {
@@ -45,7 +45,7 @@ function _makeLink(samples, voiceName, buf, sampleRate, dur) {
   playBufNode.buffer = playBuf
   playBufNode.loop = false
   playBufNode.connect(synthInst.ac.destination)
-  playBufNode.connect(analyser) // Connect playback to analyzer. Not with a "z".
+  playBufNode.connect(analyzer)
   playBufNode.start()
 
   // Create downloadable raw file contents:
