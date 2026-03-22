@@ -344,8 +344,9 @@ const ToneDefs = {
       // Build up a basic square wave that pulses for a quarter second
       const voice = m$.Voice()
       const osc = m$.Osc({
-          t: 'triangle',
+          t: 'square',
           f: voice.f,  // Use Voice frequency control
+          S: 2, // Scale one octave up
           g: m$.ADSR({ p: 1/4, x: true }, voice) // And auto-pulse for a quarter second
       })
       osc.$(voice) // Connect the output of the osc to the voice

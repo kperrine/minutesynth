@@ -702,15 +702,14 @@ console.log('Auto-renewing')
    * @param {number | undefined} w - pulse width (0-1); default: 0.1
    * @param {number | undefined} o - pulse offset (0-1); default: 0
    * @param {number | undefined} S - scale; default: 1
-   * @param {number | undefined} f - default frequency; default: 440
    * @param {number | SynthModule | [] | undefined} g - gain; default: 1
    * @param {number | undefined} s - start time; default: 0
    * @param {number | undefined} W - samples; default: 1024
    * @returns {SynthModule} An instance of a pulse module
    */
-  Pulse({ w = 0.1, o = 0, S = 1, f, g = 1, s = 0, W = 1024 } = {}) {
+  Pulse({ w = 0.1, o = 0, S = 1, g = 1, s = 0, W = 1024 } = {}) {
     // TODO: We could be cool and make a frequency domain waveform instead.
-    const module = this.Buf({ T: W / this.ac.sampleRate, S, f, g, s, n: 1, L: true })
+    const module = this.Buf({ T: W / this.ac.sampleRate, S: S * W / this.ac.sampleRate, g, s, n: 1, L: true })
     const data = module.mem()
     const bias = 0.5 - w
     for (let i in data) {
