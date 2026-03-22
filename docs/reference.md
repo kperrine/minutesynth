@@ -54,7 +54,7 @@ Note that variables are *patchable* if not specified otherwise. That means they 
 
 ### ADSR (Attack, Decay, Sustain, Release)
 
-`ADSR({ D: 0, b: 0, e: 1, a: 1e-3, d: 0, s: 1, r: 0, p: 0 }, t$)`
+`ADSR({ D: 0, b: 0, e: 1, a: 1e-3, d: 0, s: 1, r: 0, p: 0, x: false }, t$)`
 
 This uses ADSR parameters to create a module that can allow the output value to ramp up and down as specified whenever the module is triggered. Use the `t$` (second parameter) to reverse-bind a trigger (e.g. from [Voice](#voice)).
 
@@ -70,6 +70,7 @@ ADSR parameters (see the [Intro docs](intro.md#adsr-controls) for a diagram that
 | `s` | Sustain value | 1 |
 | `r` | Release time (time to go from s to b when triggerOff) | 0 |
 | `p` | Auto-pulse (if nonzero, time to automatically triggerOff) | 0 |
+| `x` | Disable "off" to allow auto-pulse to complete | false |
 
 ---
 
@@ -79,7 +80,7 @@ ADSR parameters (see the [Intro docs](intro.md#adsr-controls) for a diagram that
 
 Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is the returned buffer's `.length`. See additional notes on `Buf` further below.
 
-Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1`, `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate; `d:` detune; `n:` nominal playback frequency (0 for no freq. control), `L:` enables looping if true, `p:` loop begin in seconds with respect to nominal frequence (default: 0), and `P:` loop end (default: end).
+Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1`, `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate; `d:` detune; `n:` nominal playback frequency via the `.f` property (0 for no freq. control), `L:` enables looping if true, `p:` loop begin in seconds with respect to nominal frequence (default: 0), and `P:` loop end (default: end).
 
 Pass in `t$` from a trigger source to trigger the buffer's playback.
 
@@ -234,11 +235,11 @@ Params (all non-patchable): `t:` timesteps (seconds from trigger) array, `v:` va
 
 ### Pulse
 
-`Pulse({ w=0.1, o=0, S=1, f, g=1, s=0, W=1024 })`
+`Pulse({ w=0.1, o=0, S=1, g=1, s=0, W=1024 })`
 
-Pulse produces a pulse waveform of width w at offset o.
+Pulse produces a pulse waveform of width w at offset o. Frequency-controlled through the `.f` property
 
-Params: `w:` pulse width (0-1) (non-patchable); `o:` pulse offset (0-1) (non-patchable); `S:` scale; `f:` default frequency (non-patchable); `g:` gain; `s:` start time (non-patchable), `W:` samples (non-patchable)
+Params: `w:` pulse width (0-1) (non-patchable); `o:` pulse offset (0-1) (non-patchable); `S:` scale; `g:` gain; `s:` start time (non-patchable), `W:` samples (non-patchable)
 
 ---
 
