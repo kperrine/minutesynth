@@ -914,8 +914,10 @@ console.log('Auto-renewing')
         this.v.t(this.a.s, onTime + this.a.D + this.a.a, this.a.d / 3)
         this.onTime = onTime
         if (this.a.p) {
-          //this.onTime = null
           this.off(onTime + this.a.p)
+          if (this.a.x) {
+            this.onTime = null
+          }
         }
       }
 
@@ -927,17 +929,17 @@ console.log('Auto-renewing')
         if (!offTime) {
           offTime = this.minuteSynth.now()
         }
-        if (this.a.x && this.onTime != null && this.minuteSynth.now() < (this.onTime + this.a.p)) {
+        if (this.a.x && this.onTime == null) {
           return // Disable early release if we have force pulsed action
         }
-        if (this.onTime == null) {
-          this.v.vT(this.a.b, offTime)
-        }
-        else {
+        //if (this.onTime == null) {
+        //  this.v.vT(this.a.b, offTime)
+        //}
+        //else {
           this.v.c(offTime) // if note duration is shorter than A + D.
           this.v.t(this.a.b, offTime, this.a.r / 3)
           this.onTime = null
-        }
+        //}
       }
     }
     return new Module()
@@ -955,8 +957,8 @@ console.log('Auto-renewing')
     const origOnFn = module.on
     const origOffFn = module.off
     module.on = (onTime, freq) => {
-      if (onTime == null) {
-        onTime = this.minuteSynth.now()
+      if (!onTime) {
+        onTime = this.now()
       }
       t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
         : origOffFn.call(module, onTime + time))

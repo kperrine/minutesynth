@@ -626,7 +626,7 @@ const ToneDefs = {
           { freq: NOTES.dN, oct: 3, dur: 1/8 },
           { freq: NOTES.cN, oct: 3, dur: 1/2 }
       ]
-      let timePoint = -TONES[0].dur
+      let timePoint = -(TONES[0].dur * WHOLE_DUR)
       const program = m$.Prog({
           v: [ // Record all values; in this case, "frequency base" to signify note.
               // Each "frequency base" will be multiplied below by the voice frequency
