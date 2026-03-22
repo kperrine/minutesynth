@@ -309,36 +309,6 @@ const ToneDefs = {
     off: 0.5,
     rec: 3
   },
-  bassFilthTite: {
-    fn: m$ => {
-      // Created by 7r1x/neuralyte
-      let voice = m$.Voice(),
-          slide1 = m$.ADSR({ a: 0.2, b: 146, e: 110, s: 110, r: 1 }, voice),
-
-          // Let's scale slide such that we would drop 36 Hz if we played 110 Hz.
-          factor = m$.Gain({ g: 36/110, r$: slide1 }),
-          freqMod = m$.Gain({ g: factor, r$: voice.f }),
-
-          // Make the voice:
-          adsr = m$.ADSR({ D: 0, b: 0, e: 2, s: 1, a: 0.01, d: 0.3, r: 0.05, p: 0 }, voice)
-          osc1 = m$.Osc({ t: m$.W.SINE, f: freqMod, S: 1/4, g: adsr }),
-
-          // Other stuff:
-          noiseADSR = adsr = m$.ADSR({ D: 0.6, b: 0, e: 0.01, s: 0.1, a: 0.9, d: 0.1, r: 0.1, p: 0 }, voice),
-          noise = m$.Noise({ g: noiseADSR }),
-          filter = m$.Filt({ t: m$.F.LOWPASS, f: 2800, q: 2, g: 1, r$: [osc1, noise] }),
-          distort = m$.Dist({ a: 30, r$: filter, g: 1 }), // a = distort amount
-          compress = m$.Comp({ k: 8, r$: distort })
-
-      filter.$(voice)
-      distort.$(voice)
-      compress.$(voice)
-      return voice
-    },
-    freq: 4,
-    off: 1,
-    rec: 2
-  },
   beep: {
     fn: m$ => {
       // Build up a basic square wave that pulses for a quarter second
