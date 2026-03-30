@@ -1,13 +1,12 @@
 "use strict";
 
-// Universal audio cotext reference:
-
 // ACX is a reference to the AudioContext class, for creating AudioContext objects.
-var ACX = window.AudioContext || window.webkitAudioContext
+const ACX = window.AudioContext || window.webkitAudioContext
 
+/**
+ * Class/manespace for MinuteSynth tied to a single AudioContext
+ */
 class MinuteSynth {
-  // Represents Attack, Decay, Sustain, Release parameterized curve.
-  // The default ADSR parameters lets the tone stay on until it is shut off.
   static ADSRParams = class {
     /**
      * Creates an ADSR (Attack, Decay, Sustain, Release) parameterization
@@ -26,7 +25,41 @@ class MinuteSynth {
     }
   }
 
+  /**
+   * Default ADSR for preloading parameters that aren't otherwise redefined
+   */
   static DEFAULT_ADSR = new MinuteSynth.ADSRParams()
+
+  static Svcr = class {
+    /**
+     * Interval in miliseconds between servicing actions
+     * @type {number}
+     * @readonly
+     */
+    INTV = 1000
+
+    /**
+     * Reference to parent
+     * @type {MinuteSynth}
+     */
+    minuteSynth
+
+    constructor(minuteSynth) {
+      this.minuteSynth = minuteSynth
+      this.sched()
+    }
+
+    sched() {
+      window.setTimeout(() => this.service(), this.INTV)
+    }
+
+    service() {
+      // TODO: Here, traverse through entire tree
+      // Need to detect duplicates when crawling through lists or maintaining list here.
+
+    }
+
+  }
 
   /**
    * Sample rate that is provided by the AudioContext. By default, it is 44100 Hz.
@@ -43,6 +76,13 @@ class MinuteSynth {
   ac
 
   /**
+   * Servicer object that handles "async" servicer
+   * @type {MinuteSynth.Svcr}
+   * @readonly
+   */
+  svcr
+
+  /**
    * Length of noise sample in seconds. Equates to seconds * sampleRate samples.
    * @type {number}
    */
@@ -51,10 +91,11 @@ class MinuteSynth {
   /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
    * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
+   * @param {} servicer - Utility for starting timer tick "async" servicer
    */
-  constructor(ac = new ACX()) {
+  constructor(ac = new ACX(), servicer = new MinuteSynth.Svcr()) {
     this.ac = ac
-    this.sampleRate = ac.sampleRate
+    this.svcr = servicer    
   }
 
   /**
@@ -138,6 +179,7 @@ class MinuteSynth {
                 module.z.disconnect(obj)
               } catch (_) {}})
             inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
+            // TODO: Return true if detach was successful
           }
         }
       }
@@ -207,8 +249,10 @@ class MinuteSynth {
       }
     }
 
-    // ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
-    // -1 to defer starting, 0 to autostart now, and other to start at specified time.
+    /**
+     * ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
+     * -1 to defer starting, 0 to autostart now, and other to start at specified time.
+     */
     ParamStart = class extends this.Param {
       /**
        * Cretes a parameter that allows for start/stop control
@@ -242,6 +286,15 @@ class MinuteSynth {
         this.obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
         // TODO: Consider scheduling an object detach() at stopTime
       }
+    }
+
+    /**
+     * ParamNP represents a non-patchable parameter that is "faked" by creating a
+     * "C" object and readng its value periodically via the servicer
+     */
+    ParamNA = class extends this.Param {
+
+      
     }
 
     /**
@@ -311,6 +364,7 @@ class MinuteSynth {
           }
         }
       }
+      // TODO: Return modules that were detached. Helps chipArp tonedef.
     }
 
     /**
@@ -726,20 +780,18 @@ console.log('Auto-renewing')
 
   /**
    * Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-   * @param {function(any): number[] | undefined} F - distort function (default: this.dw())
-   * @param {number | undefined} a - default function parameter (default: 50)
+   * @param {Float32Array} c - The distortion curve to apply to the incoming signal. Consider using this.dw()
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | SynthModule | [] | undefined} r$ - reverse-attach input
    * @return {SynthModule} An instance of a distortion module
    */
-  Dist({ a = 50, F = () => this.dw(a), g = 1, r$ }) {
-    // TODO: Input param: y?
+  Dist({ c, g = 1, r$ }) {
     const module = class Dist extends this.BaseAmp {
       w = this.minuteSynth.ac.createWaveShaper()
       constructor() {
         super(g)
-        this.w.curve = F()
-        this.w.oversample = '4x'
+        this.w.curve = c
+        this.w.oversample = 'none'
         this._addParam(new this.ParamAudio(this.w, r$))
         this.w.connect(this.z)
       }
@@ -967,6 +1019,7 @@ console.log('Auto-renewing')
       }
       t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
         : origOffFn.call(module, onTime + time))
+      // TODO: Freq has no .off() method! Remove support or have another shutoff scheme.
     }
     return module
   }

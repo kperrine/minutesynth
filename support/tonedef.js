@@ -254,7 +254,7 @@ const ToneDefs = {
       const osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1/2, g: adsr })
       const noiseADSR = m$.ADSR({ D: 0.4, b: 0, e: 0.01, s: 0.05, a: 1, d: 0.1, r: 0.1, p: 0 }, voice)
       const noise = m$.Noise({ g: noiseADSR })
-      const distort = m$.Dist({ a: 4, r$: [osc1, noise], g: 4 })
+      const distort = m$.Dist({ c: m$.dw(4), r$: [osc1, noise], g: 4 })
       const filterADSR = m$.ADSR({ D: 0.01, b: 2000, e: 50, s: 3200, a: 0.4, d: 0.1, r: 0.5, p: 0 }, voice)
   
       const filter = m$.Filt({ t: m$.F.HIGHPASS, f: filterADSR, q: 10, g: 0.65, r$: distort })
@@ -275,7 +275,7 @@ const ToneDefs = {
       const slide1 = m$.ADSR({ a: 2, b: 146, e: 0.73, s: 1, r: 1 }, voice)
       const adsr = m$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
       const osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1/2, g: adsr })
-      const distort = m$.Dist({ a: 55, r$: osc1, g: 1 })
+      const distort = m$.Dist({ c: m$.dw(55), r$: osc1, g: 1 })
       const filterADSR = m$.ADSR({ D: 0.01, b: 1000, e: 100, s: 1000, a: 0.21, d: 0.1, r: 0.9, p: 0 }, voice) // change s for fun
 
       const filter = m$.Filt({ t: m$.F.HIGHPASS, f: filterADSR, q: 8, g: 0.65, r$: distort })
@@ -345,7 +345,7 @@ const ToneDefs = {
       // NOTE: Currently does not respond to Voice frequency input.
       const voice = m$.Voice(),
             osc1 = m$.Osc({ t: m$.W.SINE, f: 50 }),
-            distorter = m$.Dist({ a: 30, r$: osc1 }),
+            distorter = m$.Dist({ c: m$.dw(30), r$: osc1 }),
             filter = m$.Filt({ t: m$.F.HIGHPASS, q: 0.5, f: 3000, r$: distorter }),
               // Bring down f to your liking
             compressor = m$.Comp({ k: 0.5, g: 5, r$: filter }),
@@ -364,17 +364,17 @@ const ToneDefs = {
       const voice = m$.Voice(),
             noise = m$.Noise(),
             noiseGate = m$.Noise({ r: 0.001 }),
-            gateDistort = m$.Dist({ a: 500, r$: noiseGate, g: 5 }),
+            gateDistort = m$.Dist({ c: m$.dw(500), r$: noiseGate, g: 5 }),
             noiseGain = m$.Gain({ g: 0.5, r$: gateDistort }),
             filter = m$.Filt({ t: 'bandpass', q: 30, f: 2200, r$: noise,
                                g: [0.5, noiseGain] }),
-            distorter = m$.Dist({ a: 50, r$: filter }),
+            distorter = m$.Dist({ c: m$.dw(50), r$: filter }),
             otherGate = m$.Osc({ t: 'square', f: 31, g: 0.5 }),
             otherGate2 = m$.Osc({ t: 'square', f: 13, g: 0.5 }),
             gateGain1 = m$.Gain({ g: [0.5, otherGate], r$: distorter }),
             gateGain2 = m$.Gain({ g: [0.7, otherGate2], r$: gateGain1 }),
             filterAgain = m$.Filt({ t: 'bandpass', q: 30, f: 4400, r$: gateGain2, g: 2 }),
-            distorterAgain = m$.Dist({ a: 1.2, g: 30, r$: filterAgain })
+            distorterAgain = m$.Dist({ c: m$.dw(1.2), g: 30, r$: filterAgain })
       distorterAgain.$(voice)
       return voice
     },
@@ -422,11 +422,57 @@ const ToneDefs = {
           highpass = m$.Filt({ t: m$.F.HIGHPASS, q: 4, f: fADSR, r$: [tone1, tone2] }),
           lowpass = m$.Filt({ t: m$.F.LOWPASS, q: 0.2, f: 4000, r$: highpass }),
           ampADSR = m$.ADSR({ d: 3, s: 0.8, r: 0.1 }, voice),
-          amp = m$.Gain({ g: ampADSR, r$: [tone1, tone2, lowpass] });
+          amp = m$.Gain({ g: ampADSR, r$: [tone1, tone2, lowpass] })
       voice.f.$(tone1.f)
       voice.f.$(tone2.f)
-      amp.$(voice);
-      return voice;
+      amp.$(voice)
+      return voice
+    },
+    off: 2.2,
+    rec: 2.3
+  },
+  chipArp: {
+    fn: m$ => {
+      // Demonstrates grabbing a tone definition and altering it. In this case, a
+      // m$.Prog is set up to make an arpeggio out of a "chip" tone.
+      const voice = ToneDefs.chip.fn(m$)
+
+      // Form a minor chord arpeggio, each lasting a 20th of a second:
+      const DUR = 0.05
+      const REPS = 16
+      const getFreqBase = (octave, offset) => 2**(((octave - 4) * 12 + offset) / 12)
+      const freqBases = [getFreqBase(4, 0), getFreqBase(4, 3), getFreqBase(4, 7)]
+      const freqs = []
+      const times = []
+      let t = -DUR
+      for (let i = 0; i < REPS; i++) {
+        freqs.push(...freqBases)
+        times.push(...freqBases.map(() => t += DUR))
+      }
+      const program = m$.Prog({ v: freqs, t: times })
+
+      // Then, get final frequency by multiplying freq. base with the voice's
+      // frequency generator. Make Gain now, hook up later.
+      const adjFreq = m$.Gain()
+
+      // Feed that in to the chip voice's freq. control, zeroing out the original
+      // assignment. (If I don't first detach, then original is added to this.)
+      // TODO: Find a better way to swap out a module without getting into the weeds
+      Array.from(voice.f._outParams).forEach(param => {
+        const target = param.synthModule
+        voice.f.detach(target)
+        adjFreq.$(target.f)
+      })
+
+      // Connect inputs to the gain module now because we're done removing old
+      // voice frequency control connections:
+      program.$(adjFreq)
+      voice.f.$(adjFreq.g)
+
+      // Now trigger the program:
+      voice.$(program)
+
+      return voice
     },
     off: 2.2,
     rec: 2.3
@@ -509,7 +555,7 @@ const ToneDefs = {
           fMult = m$.Gain({ g: fADSR, r$: voice.f }),
           filter = m$.Filt({ t: 'lowpass', g: 1, q: 1, f: fMult }),
           dADSR = m$.ADSR({ a: 0.01, e: 0.3, r: 0.8, p: 0.02 }, voice),
-          distorter = m$.Dist({ a: 2, g: dADSR, r$: filter }),
+          distorter = m$.Dist({ c: m$.dw(2), g: dADSR, r$: filter }),
           mADSR = m$.ADSR({ a: 0.01, r: 1.5, p: 0.02 }, voice),
           mAmp = m$.Gain({ g: mADSR, r$: filter }),
           harmonics = [0.5, 2, 3, 4.2, 5.4, 6.8]
@@ -531,7 +577,7 @@ const ToneDefs = {
           fADSR = m$.ADSR({ b: 0.05, a: 0.5, e: .4, d: 1, s: 0.5, r: 0.2 }, voice),
           fADSRMult = m$.Gain({ g: voice.f, r$: fADSR }),
           filter = m$.Filt({ t: m$.F.LOWPASS, q: 1, f: fADSRMult, r$: modulator }),
-          distorter = m$.Dist({ a: 15, r$: filter }),
+          distorter = m$.Dist({ c: m$.dw(15), r$: filter }),
           loud = m$.Gain({ g: 3, r$: distorter })
       loud.$(voice)
       m$.ADSR({r: 1}, voice).$(voice.g)
