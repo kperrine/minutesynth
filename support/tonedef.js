@@ -477,6 +477,43 @@ const ToneDefs = {
     off: 2.2,
     rec: 2.3
   },
+  xfade: {
+    fn: m$ => {
+      // XFader allows for -1 to let all of Input A through, 1 to let all
+      // of Input B through, and 0 to let both through.
+      // Drawn from: https://github.com/notthetup/crossfade
+      const powerCurve = (dir, size = 1024) => {
+        const curveArray = new Float32Array(size)
+        for (let index = 0; index < size; index++) {
+          const currIndex = dir ? index : size - index
+          curveArray[index] = Math.sqrt(currIndex / size)
+        }
+        return curveArray
+      }
+
+      // Level shall map to two power curves-- one increasing, and one
+      // decreasing-- to assign respective power depending upon its [-1..1]
+      // centeredness.
+      const pcvUp = m$.Dist({ c: powerCurve(true) })
+      const pcvDown = m$.Dist({ c: powerCurve(false) })
+      const level = m$.Osc({ t: m$.W.TRIANGLE, f: 1 })
+      level.$(pcvUp)
+      level.$(pcvDown)
+
+      // Then, create two tones, and set their gains according to the power
+      // curve mappings:
+      const voice = m$.Voice()
+      const adsr = m$.ADSR({ a: 0.05, e: 0.6, d: 1, s: 0.5, r: 0.3 }, voice)
+      adsr.$(voice.g)
+      const tone1 = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: pcvDown })
+      const tone2 = m$.Osc({ t: m$.W.TRIANGLE, f: 350, g: pcvUp })
+      tone1.$(voice)
+      tone2.$(voice)
+      return voice
+    },
+    off: 4,
+    rec: 4.5
+  },
   hiHat: {
     fn: m$ => {
       // From Joe Sullivan: http://joesul.li/van/synthesizing-hi-hats/
@@ -727,7 +764,7 @@ const ToneDefs = {
       }
 
       // Set up output voice, and connect my MinuteSynth module buffer to it:
-      const voice = m$.Voice()
+      const voice = m$.Voice({ g: 2 })
       voice.rg(tgtBuf)
       voice.f.$(tgtBuf.f) // Hook up frequency control, too
       tgtBuf.$(voice)

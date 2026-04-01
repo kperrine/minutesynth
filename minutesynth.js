@@ -426,6 +426,7 @@ console.log(`Frequency helper rate: ${this._calcSCRate()}`)
      * @param {AudioNode} node - The old AudioNode to replace
      * @param {AudioNode} newNode - The AudioNode to replace. (Sorry, can't discern from the old one.)
      * @return {AudioNode} The new AudioNode that is now attached to this module's parameters.
+     * TODO: See if this is easier if we renew by SynthModule instead of AudioNode
      */
     renew(node, newNode) {
       // Function to return the key (attribute) name that a given object (value) is stored under
