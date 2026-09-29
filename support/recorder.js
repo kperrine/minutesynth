@@ -1,3 +1,6 @@
+/**
+ * MinuteSynth audio recording and export utilities
+ */
 "use strict";
 
 async function record8(voiceName, voiceFunc, sampleRate=16574, dur=3.95, noteFreq, noteOff, callback) {

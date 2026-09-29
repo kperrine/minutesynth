@@ -1,10 +1,15 @@
+/**
+ * MinuteSynth: A small-scale library to ease the use of the WebAudio API
+ *
+ * Docs, examples, usage, license: https://github.com/kperrine/minutesynth
+ */
 "use strict";
 
 // ACX is a reference to the AudioContext class, for creating AudioContext objects.
 const ACX = window.AudioContext || window.webkitAudioContext
 
 /**
- * Class/manespace for MinuteSynth tied to a single AudioContext
+ * Class/namespace for MinuteSynth tied to a single AudioContext
  */
 class MinuteSynth {
   static ADSRParams = class {
@@ -30,44 +35,6 @@ class MinuteSynth {
    */
   static DEFAULT_ADSR = new MinuteSynth.ADSRParams()
 
-  static Svcr = class {
-    /**
-     * Interval in miliseconds between servicing actions
-     * @type {number}
-     * @readonly
-     */
-    INTV = 1000
-
-    /**
-     * Reference to parent
-     * @type {MinuteSynth}
-     */
-    minuteSynth
-
-    constructor(minuteSynth) {
-      this.minuteSynth = minuteSynth
-      this.sched()
-    }
-
-    sched() {
-      window.setTimeout(() => this.service(), this.INTV)
-    }
-
-    service() {
-      // TODO: Here, traverse through entire tree
-      // Need to detect duplicates when crawling through lists or maintaining list here.
-
-    }
-
-  }
-
-  /**
-   * Sample rate that is provided by the AudioContext. By default, it is 44100 Hz.
-   * @type {number}
-   * @readonly
-   */
-  sampleRate
-
   /**
    * AudioContext object that is to be used to produce WebAudio objects.
    * @type {AudioContext}
@@ -76,26 +43,17 @@ class MinuteSynth {
   ac
 
   /**
-   * Servicer object that handles "async" servicer
-   * @type {MinuteSynth.Svcr}
-   * @readonly
-   */
-  svcr
-
-  /**
    * Length of noise sample in seconds. Equates to seconds * sampleRate samples.
    * @type {number}
    */
-  NOISE_LEN = 1.0
+  noiseLen = 1.0
 
   /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
    * @param {AudioContext | undefined} ac - The AudioContext to use (default: new AudioContext()).
-   * @param {} servicer - Utility for starting timer tick "async" servicer
    */
-  constructor(ac = new ACX(), servicer = new MinuteSynth.Svcr()) {
+  constructor(ac = new ACX()) {
     this.ac = ac
-    this.svcr = servicer    
   }
 
   /**
@@ -289,15 +247,6 @@ class MinuteSynth {
     }
 
     /**
-     * ParamNP represents a non-patchable parameter that is "faked" by creating a
-     * "C" object and readng its value periodically via the servicer
-     */
-    ParamNA = class extends this.Param {
-
-      
-    }
-
-    /**
      * Attaches this module to a parameter (or main input) of a downstream module. tgtThing can either be
      * a Module or a Param.
      * @param {SynthModule | Param} tgtThing 
@@ -407,7 +356,6 @@ class MinuteSynth {
         // If the default value is a number, then create a constant for it:
         const freqC = this.minuteSynth.C(defVal)
         // TODO: Inherit the parameters rather than recreating.
-console.log(`Adding frequency helper with defVal ${defVal}`)
         this._addParam(new this.ParamValue('f', freqC.z.offset, defVal))
         freqC.$(gainModule)
       }
@@ -415,7 +363,6 @@ console.log(`Adding frequency helper with defVal ${defVal}`)
         // TODO: Inherit the parameters rather than recreating.
         this._addParam(new this.ParamValue('f', gainModule.z, defVal))
       }
-console.log(`Frequency helper rate: ${this._calcSCRate()}`)
       this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate()))
       gainModule.z.connect(control)
       return gainModule
@@ -439,7 +386,6 @@ console.log(`Frequency helper rate: ${this._calcSCRate()}`)
         }
       }
 
-console.log(`Param-level renew for ${node.constructor.name} in ${this.constructor.name}`)
       Object.values(this._params).forEach(param => {
         const key = getKeyByValue(node, param.obj)
         if (key) {
@@ -447,7 +393,6 @@ console.log(`Param-level renew for ${node.constructor.name} in ${this.constructo
           param._inModules.forEach(module => {
             const inParam = module._outParams.find(p => p.obj === this.obj)
             if (inParam) {
-console.log(`Reconnecting Parameter ${inParam.name} via ${key}`)
               if (!foundFlag) {
                 newNode[key].value = 0
                 foundFlag = true
@@ -458,7 +403,6 @@ console.log(`Reconnecting Parameter ${inParam.name} via ${key}`)
           param.obj = newNode[key]
         }
         else if (param.obj === node) {
-console.log(`Reconnecting main audio input ${param.name}`)
           param.obj = newNode
         }
       })
@@ -566,7 +510,6 @@ console.log(`Reconnecting main audio input ${param.name}`)
         console.log(`Start parameter: ${s}`)
         this._addParam(new this.ParamStart(this.B, s))
         this._addParam(new this.ParamValue('d', this.B.detune, d))
-console.log(`BUF: Rate parameter: ${r}, nominal freq: ${n}`)
         if (n) {
           this.#fGain = this._addFreqHelper(this.B.playbackRate, n)
         }
@@ -596,12 +539,10 @@ console.log(`BUF: Rate parameter: ${r}, nominal freq: ${n}`)
         console.log(`Buffer on at ${onTime}${onTime == nowTime ? ' (now)' : ''} with freq ${freq}`)
         if (this.#autoMode) {
           // We are playing already. Must stop and refresh first.
-console.log(`Preemptive stop at: ${onTime}`)
           this.B.stop(onTime)
         }
         setTimeout(() => {
           if (this.#autoMode) {
-console.log('Auto-renewing')
             this.renew(freq)
           }
           else {
@@ -684,64 +625,6 @@ console.log('Auto-renewing')
   }
 
   /**
-   * Trig is a helper class that translates a triggering action to an ES6/browser
-   * Window timeout that is called to a trig() method to be implemented.
-   */
-  Trig = class Trig extends this.SynthModule {
-    #triggered = false
-
-    /**
-     * Called by a trigger source (e.g. Voice) to schedule an activation
-     * @param {number | undefined} onTime - The time WRT AudioContext at which to start the play action; 0 for immmediate.
-     * @param {number | undefined} freq - Frequency value passed along with the triggering event
-     */
-    on(onTime, freq) {
-      const nowTime = this.minuteSynth.now()
-      if (onTime != null && onTime < nowTime) {
-        onTime = 0
-      }
-      if (this.#triggered) {
-        this.off() // Call off now and do synchronous action
-      }
-      const func = () => {
-        this.#triggered = true
-        this.trig(freq)
-      }
-      if (onTime) {
-        setTimeout(func, (onTime - nowTime) * 1000)
-      }
-      else {
-        func() // Keep trig() call in sync if onTime is now.
-      }
-    }
-
-    /**
-     * Called by a trigger source (e.g. Voice) to schedule deactivation
-     * @param {number | undefined} offTime - The time WRT AudioContext at which to start the release action; 0 for immediate.
-     */
-    off(offTime) {
-      const nowTime = this.minuteSynth.now()
-      if (offTime != null && offTime < nowTime) {
-        offTime = 0
-      }
-      const func = () => {
-        this.trig()
-        this.#triggered = false
-      }
-      if (offTime) {
-        setTimeout(func, (offTime - nowTime) * 1000)
-      }
-      else {
-        func() // Keep trig() call in sync if offTime is now.
-      }
-    }
-
-    trig(freq) {
-      console.assert(false, "trig() must be implemented by subclass")
-    }
-  }
-
-  /**
    * Noise produces a playable buffer of noise.
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
@@ -750,7 +633,7 @@ console.log('Auto-renewing')
    * @returns {SynthModule} An instance of a noise module
    */
   Noise({ g = 1, s = 0, r, d } = {}) {
-    const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0, L: true })
+    const module = this.Buf({ T: this.noiseLen, g, s, r, d, n: 0, L: true })
     const data = module.mem()
     for (let i = 0; i < data.length; i++) {
       data[i] = Math.random() * 2 - 1
@@ -990,14 +873,9 @@ console.log('Auto-renewing')
         if (this.a.x && this.onTime == null) {
           return // Disable early release if we have force pulsed action
         }
-        //if (this.onTime == null) {
-        //  this.v.vT(this.a.b, offTime)
-        //}
-        //else {
-          this.v.c(offTime) // if note duration is shorter than A + D.
-          this.v.t(this.a.b, offTime, this.a.r / 3)
-          this.onTime = null
-        //}
+        this.v.c(offTime) // if note duration is shorter than A + D.
+        this.v.t(this.a.b, offTime, this.a.r / 3)
+        this.onTime = null
       }
     }
     return new Module()
@@ -1049,6 +927,37 @@ console.log('Auto-renewing')
     }
     const module = this.Osc({ r: real, i: imag, f, s, g, S: this.ac.sampleRate / R * S, n })
     return module
+  }
+
+  /**
+   * Xfade (Crossfade) module allows for smoothly transitioning between two audio sources.
+   * Set c to -1 to let all of the default input through, 1 to let all of Input Z2 through,
+   * and 0 to let both through.
+   * @param {number | SynthModule | [] | undefined} c - Crossfade control value (-1 to 1), default: 0
+   * @param {number | SynthModule | [] | undefined} g - Gain (default: 1)
+   * @param {SynthModule | [] | undefined} r$ - Input A for the crossfade
+   * @param {SynthModule | []} B - Input B for the crossfade
+   * @returns {SynthModule} An instance of a crossfade module
+   */
+  Xfade({ c = 0, g = 1, r$, B }) {
+    const module = class Xfade extends this.BaseAmp {
+      constructor() {
+        super(g)
+        const fadeVal = this.minuteSynth.C(c)
+        this._addParam(new this.ParamValue('c', fadeVal.z.offset, c))
+        const pcvUp = this.minuteSynth.Dist({ c: this.minuteSynth.powerCurve(true) })
+        const pcvDown = this.minuteSynth.Dist({ c: this.minuteSynth.powerCurve(false) })
+        fadeVal.$(pcvUp)
+        fadeVal.$(pcvDown)
+        const gainA = this.minuteSynth.Gain({ g: pcvUp })
+        const gainB = this.minuteSynth.Gain({ g: pcvDown })
+        this._addParam(new this.ParamAudio(gainA.z, r$))
+        this._addParam(new this.ParamValue('B', gainB.z, B))
+        gainA.z.connect(this.z)
+        gainB.z.connect(this.z)
+      }
+    }
+    return new module()
   }
 
   /**
@@ -1241,5 +1150,21 @@ console.log('Auto-renewing')
       curve[i] = (3 + amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x))
     }
     return curve
+  }
+
+  /**
+   * Return a power curve for crossfading
+   * Drawn from: https://github.com/notthetup/crossfade
+   * @param {boolean} dir - true for increasing curve 
+   * @param {number} size - Number of samples in the power curve
+   * @returns {Float32Array} The power curve array
+   */
+  powerCurve(dir, size = 1024) {
+    const curveArray = new Float32Array(size)
+    for (let index = 0; index < size; index++) {
+      const currIndex = dir ? index : size - index
+      curveArray[index] = Math.sqrt(currIndex / size)
+    }
+    return curveArray
   }
 }

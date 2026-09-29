@@ -479,36 +479,19 @@ const ToneDefs = {
   },
   xfade: {
     fn: m$ => {
-      // XFader allows for -1 to let all of Input A through, 1 to let all
-      // of Input B through, and 0 to let both through.
-      // Drawn from: https://github.com/notthetup/crossfade
-      const powerCurve = (dir, size = 1024) => {
-        const curveArray = new Float32Array(size)
-        for (let index = 0; index < size; index++) {
-          const currIndex = dir ? index : size - index
-          curveArray[index] = Math.sqrt(currIndex / size)
-        }
-        return curveArray
-      }
-
-      // Level shall map to two power curves-- one increasing, and one
-      // decreasing-- to assign respective power depending upon its [-1..1]
-      // centeredness.
-      const pcvUp = m$.Dist({ c: powerCurve(true) })
-      const pcvDown = m$.Dist({ c: powerCurve(false) })
-      const level = m$.Osc({ t: m$.W.TRIANGLE, f: 1 })
-      level.$(pcvUp)
-      level.$(pcvDown)
-
-      // Then, create two tones, and set their gains according to the power
-      // curve mappings:
       const voice = m$.Voice()
+
+      // Create two tones:
       const adsr = m$.ADSR({ a: 0.05, e: 0.6, d: 1, s: 0.5, r: 0.3 }, voice)
-      adsr.$(voice.g)
-      const tone1 = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: pcvDown })
-      const tone2 = m$.Osc({ t: m$.W.TRIANGLE, f: 350, g: pcvUp })
-      tone1.$(voice)
-      tone2.$(voice)
+      const tone1 = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr })
+      const tone2 = m$.Osc({ t: m$.W.TRIANGLE, f: 350, g: adsr })
+
+      // Set up a crossfade between them using a bouncy level
+      const level = m$.Osc({ t: m$.W.TRIANGLE, f: 1 })
+
+      // Crossfade!
+      const xfader = m$.Xfade({ c: level, r$: tone1, B: tone2 })
+      xfader.$(voice)
       return voice
     },
     off: 4,
@@ -787,16 +770,16 @@ const ToneDefs = {
       // Now, after including that stuff above, prepare to receive triggers:
       zzfxX = m$.ac // Use the MinuteSynth AudioContext
       const voice = m$.Voice()
-      class TrigDest extends m$.Trig {
-        trig(freq) {
+      // Register trigger dest. with the voice:
+      voice.rg({
+        on(_, freq) {
           if (freq) {
             // Run a ZzFx call that I made in https://killedbyapixel.github.io/ZzFX/
             zzfx(...[.8,.1,freq,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
           }
           // Ignore if frequency is undefined.
         }
-      }
-      voice.rg(new TrigDest()) // Register trigger dest. with the voice
+      })
       return voice
     },
     off: 2,
