@@ -19,6 +19,7 @@ This is a reference for the MinuteSynth wrapper library for WebAudio found in mo
   - [Prog (Program)](#prog-program)
   - [Pulse](#pulse)
   - [Spec (Spectrum)](#spec-spectrum)
+  - [Xfade (Crossfade)](#xfade-crossfade)
   - [Voice](#voice)
   - [Special AudioNode Adaptor](#special-audionode-adaptor)
   - [Others TODO](#others-todo)
@@ -253,6 +254,14 @@ This creates a complex oscillator waveform from a series of real frequencies. Ga
 Params (all non-patchable): `F:` Array of frequencies, `G:` Array of gains (default: 1's), `n:` nominal frequency, `R:` sample size
 
 There is also `g:` (patchable) for default gain, and `S:` (non-patchable) start time (which can be `-1`, `0`, and greater as documented in [Oscillator](#osc-oscillator))
+
+---
+
+### Xfade (Crossfade)
+
+`Xfade({ c=0, g=1, r$, B })`
+
+
 
 ---
 

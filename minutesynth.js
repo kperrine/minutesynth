@@ -939,7 +939,7 @@ class MinuteSynth {
    * @param {SynthModule | []} B - Input B for the crossfade
    * @returns {SynthModule} An instance of a crossfade module
    */
-  Xfade({ c = 0, g = 1, r$, B }) {
+  Xfade({ c = 0, g = 1, r$, A, B }) {
     const module = class Xfade extends this.BaseAmp {
       constructor() {
         super(g)
@@ -952,6 +952,7 @@ class MinuteSynth {
         const gainA = this.minuteSynth.Gain({ g: pcvUp })
         const gainB = this.minuteSynth.Gain({ g: pcvDown })
         this._addParam(new this.ParamAudio(gainA.z, r$))
+        // TODO: Alias in 'A'
         this._addParam(new this.ParamValue('B', gainB.z, B))
         gainA.z.connect(this.z)
         gainB.z.connect(this.z)
