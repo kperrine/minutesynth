@@ -435,7 +435,7 @@ class MinuteSynth {
     SINE: 1,
     SQUARE: 2,
     SAWTOOTH: 3,
-    TRIANGE: 4,
+    TRIANGLE: 4,
     CUSTOM: 5
   })
 
@@ -931,11 +931,12 @@ class MinuteSynth {
 
   /**
    * Xfade (Crossfade) module allows for smoothly transitioning between two audio sources.
-   * Set c to -1 to let all of the default input through, 1 to let all of Input Z2 through,
+   * Set c to -1 to let all of the "A" or default input through, 1 to let all of Input "B" through,
    * and 0 to let both through.
-   * @param {number | SynthModule | [] | undefined} c - Crossfade control value (-1 to 1), default: 0
+   * @param {number | SynthModule | [] | undefined} c - Crossfade control value (clamps -1 to 1), default: 0
    * @param {number | SynthModule | [] | undefined} g - Gain (default: 1)
    * @param {SynthModule | [] | undefined} r$ - Input A for the crossfade
+   * @param {SynthModule | [] | undefined} A - Input A for the crossfade (alias for r$)
    * @param {SynthModule | []} B - Input B for the crossfade
    * @returns {SynthModule} An instance of a crossfade module
    */
@@ -952,7 +953,7 @@ class MinuteSynth {
         const gainA = this.minuteSynth.Gain({ g: pcvUp })
         const gainB = this.minuteSynth.Gain({ g: pcvDown })
         this._addParam(new this.ParamAudio(gainA.z, r$))
-        // TODO: Alias in 'A'
+        this._addParam(new this.ParamValue('A', gainA.z, A))
         this._addParam(new this.ParamValue('B', gainB.z, B))
         gainA.z.connect(this.z)
         gainB.z.connect(this.z)

@@ -484,13 +484,13 @@ const ToneDefs = {
       // Create two tones:
       const adsr = m$.ADSR({ a: 0.05, e: 0.6, d: 1, s: 0.5, r: 0.3 }, voice)
       const tone1 = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr })
-      const tone2 = m$.Osc({ t: m$.W.TRIANGLE, f: 350, g: adsr })
+      const tone2 = m$.Osc({ t: m$.W.SINE, f: 350, g: adsr })
 
       // Set up a crossfade between them using a bouncy level
-      const level = m$.Osc({ t: m$.W.TRIANGLE, f: 1 })
+      const level = m$.Osc({ t: m$.W.TRIANGLE, f: 1, g: 1.2 })
 
       // Crossfade!
-      const xfader = m$.Xfade({ c: level, r$: tone1, B: tone2 })
+      const xfader = m$.Xfade({ c: level, A: tone1, B: tone2 })
       xfader.$(voice)
       return voice
     },

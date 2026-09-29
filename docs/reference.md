@@ -261,7 +261,9 @@ There is also `g:` (patchable) for default gain, and `S:` (non-patchable) start 
 
 `Xfade({ c=0, g=1, r$, B })`
 
+Crossfades, or smoothly transitions between two audio sources while maintaining power balance. Set c to -1 to let all of the "A" or default input through, 1 to let all of Input "B" through, and 0 to let both through.
 
+Params: `c:` Crossfade control value (clamps -1 to 1), default: 0, `g:` gain (default: 1), `r$:` or `A:` for input channel "A", and `B:` for input channel "B"
 
 ---
 
