@@ -65,7 +65,7 @@ class MinuteSynth {
      * minuteSynth is a reference to the parent MinuteSynth instance
      * @type {MinuteSynth}
      */
-    minuteSynth = parent
+    m$ = parent
 
     /**
      * collection of parameters for this module
@@ -91,7 +91,7 @@ class MinuteSynth {
       _inModules
 
       /** @type {SynthModule} */
-      synthModule = parent
+      sMod = parent
 
       /**
        * Cretes a parameter that allows for attachment to another module
@@ -115,7 +115,7 @@ class MinuteSynth {
       r$(srcModules) {
         for (let module of [].concat(srcModules)) {
           if (!isNaN(module)) {
-            module = this.synthModule.minuteSynth.C(module)
+            module = this.sMod.m$.C(module)
           }
           this._inModules.push(module)
           if (module._$(this.obj)) {
@@ -232,7 +232,7 @@ class MinuteSynth {
        */
       go(startTime = 0) {
         console.log(`Start time: ${startTime}`)
-        this.obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
+        this.obj.start((startTime == 0) ? this.sMod.m$.now() : startTime)
       }
 
       /**
@@ -241,7 +241,7 @@ class MinuteSynth {
        */
       stop(stopTime = 0) {
         console.log(`Stop time: ${stopTime}`)
-        this.obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
+        this.obj.stop((stopTime == 0) ? this.sMod.m$.now() : stopTime)
         // TODO: Consider scheduling an object detach() at stopTime
       }
     }
@@ -258,7 +258,7 @@ class MinuteSynth {
       // if param exists in this, add index to it, e.g. "g2". That would allow for easier manipulation
       // of params from one location.
       if (tgtThing instanceof AudioNode) {
-        tgtThing = this.minuteSynth.ACN(tgtThing)
+        tgtThing = this.m$.ACN(tgtThing)
       }
       // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
       let param = tgtThing
@@ -279,7 +279,7 @@ class MinuteSynth {
       [].concat(srcModules).forEach(module => {
         if (!isNaN(module)) {
           // If the source module is a number, then wrap it in a "C" module:
-          module = this.minuteSynth.C(module)
+          module = this.m$.C(module)
         }
         module.$(this, thisParamName)
       })
@@ -335,7 +335,7 @@ class MinuteSynth {
         [].concat(param._defVal).forEach(element => {
           if (!isNaN(element)) {
             // If a plain number was given in an array, then wrap it in a "C" module:
-            element = this.minuteSynth.C(element)
+            element = this.m$.C(element)
           }
           element.$(param)
         })
@@ -351,10 +351,10 @@ class MinuteSynth {
      */
     _addFreqHelper(control, defVal) {
       control.value = 0
-      const gainModule = this.minuteSynth.Gain()
+      const gainModule = this.m$.Gain()
       if (!isNaN(defVal)) {
         // If the default value is a number, then create a constant for it:
-        const freqC = this.minuteSynth.C(defVal)
+        const freqC = this.m$.C(defVal)
         // TODO: Inherit the parameters rather than recreating.
         this._addParam(new this.ParamValue('f', freqC.z.offset, defVal))
         freqC.$(gainModule)
@@ -423,7 +423,7 @@ class MinuteSynth {
      */
     constructor(gainVal = 1) {
       super()
-      this.z = this.minuteSynth.ac.createGain()
+      this.z = this.m$.ac.createGain()
       this._addParam(new this.ParamValue('g', this.z.gain, gainVal))
     }
   }
@@ -456,7 +456,7 @@ class MinuteSynth {
    */
   Osc({ t, S = 1, f = 440, d, g = 1, s = 0, r, i, n = 1 }) {
     const Module = class Osc extends this.BaseAmp {
-      o = this.minuteSynth.ac.createOscillator()
+      o = this.m$.ac.createOscillator()
       _calcSCRate = () => S / n
 
       constructor() {
@@ -465,7 +465,7 @@ class MinuteSynth {
           this.o.type = isNaN(t) ? t : ['sine', 'square', 'sawtooth', 'triangle', 'custom'][t - 1]
         }
         if (r) {
-          this.o.setPeriodicWave(this.minuteSynth.ac.createPeriodicWave(r, i))
+          this.o.setPeriodicWave(this.m$.ac.createPeriodicWave(r, i))
         }
         this._addParam(new this.ParamStart(this.o, s))
         this._addParam(new this.ParamValue('d', this.o.detune, d))
@@ -496,8 +496,8 @@ class MinuteSynth {
    */
   Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0, L, p, P }, t$) {
     const Module = class Buf extends this.BaseAmp {
-      b = this.minuteSynth.ac.createBuffer(c, ~~(F * T), F)
-      B = this.minuteSynth.ac.createBufferSource()
+      b = this.m$.ac.createBuffer(c, ~~(F * T), F)
+      B = this.m$.ac.createBufferSource()
       L = L
       p = p
       P = P
@@ -529,7 +529,7 @@ class MinuteSynth {
        * @param {number} freq - If specified, used to calculate the playback rate
        */
       on(onTime, freq) {
-        const nowTime = this.minuteSynth.now()
+        const nowTime = this.m$.now()
         if (!onTime) {
           onTime = nowTime
         }
@@ -558,7 +558,7 @@ class MinuteSynth {
        * @param {number | undefined} offTime - The time at which to start the release action.
        */
       off(offTime) {
-        const nowTime = this.minuteSynth.now()
+        const nowTime = this.m$.now()
         if (offTime == null) {
           offTime = nowTime
         }
@@ -602,7 +602,7 @@ class MinuteSynth {
       renew(freq) {
         console.log('Renewing buffer source')
         this.#autoMode = false
-        this.B = super.renew(this.B, this.minuteSynth.ac.createBufferSource())
+        this.B = super.renew(this.B, this.m$.ac.createBufferSource())
         this.#applyAttrs(freq)
         if (this.#fGain) {
           this.B.playbackRate.value = 0
@@ -671,7 +671,7 @@ class MinuteSynth {
    */
   Dist({ c, g = 1, r$ }) {
     const module = class Dist extends this.BaseAmp {
-      w = this.minuteSynth.ac.createWaveShaper()
+      w = this.m$.ac.createWaveShaper()
       constructor() {
         super(g)
         this.w.curve = c
@@ -710,7 +710,7 @@ class MinuteSynth {
    */
   Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
     const module = class Filt extends this.BaseAmp {
-      q = this.minuteSynth.ac.createBiquadFilter()
+      q = this.m$.ac.createBiquadFilter()
       _calcSCRate = () => S
       constructor() {
         super(g)
@@ -736,7 +736,7 @@ class MinuteSynth {
    */
   Conv({ b, g = 1, n = true, r$ }) {
     const Module = class Conv extends this.BaseAmp {
-      c = this.minuteSynth.ac.createConvolver()
+      c = this.m$.ac.createConvolver()
       b = b
 
       constructor() {
@@ -763,7 +763,7 @@ class MinuteSynth {
    */
   Comp ({ t, k, o, a, r, g=1, r$ }={}) {
     const module = class Comp extends this.BaseAmp {
-      R = this.minuteSynth.ac.createDynamicsCompressor()
+      R = this.m$.ac.createDynamicsCompressor()
       constructor() {
         super(g)
         this._addParam(new this.ParamAudio(this.R, r$))
@@ -782,7 +782,7 @@ class MinuteSynth {
    * BaseC (Constant) type that can be extended for other modules below
    */
   BaseC = class C extends this.SynthModule {
-    z = this.minuteSynth.ac.createConstantSource()
+    z = this.m$.ac.createConstantSource()
     constructor(v = 0) {
       super()
       this._addParam(new this.ParamValue('v', this.z.offset, v))
@@ -842,7 +842,7 @@ class MinuteSynth {
        */
       on(onTime) {
         if (!onTime) {
-          onTime = this.minuteSynth.now()
+          onTime = this.m$.now()
         }
         if (this.#newState) {
           this.v.vT(this.a.b, onTime)
@@ -868,7 +868,7 @@ class MinuteSynth {
        */
       off(offTime) {
         if (!offTime) {
-          offTime = this.minuteSynth.now()
+          offTime = this.m$.now()
         }
         if (this.a.x && this.onTime == null) {
           return // Disable early release if we have force pulsed action
@@ -944,14 +944,14 @@ class MinuteSynth {
     const module = class Xfade extends this.BaseAmp {
       constructor() {
         super(g)
-        const fadeVal = this.minuteSynth.C(c)
+        const fadeVal = this.m$.C(c)
         this._addParam(new this.ParamValue('c', fadeVal.z.offset, c))
-        const pcvUp = this.minuteSynth.Dist({ c: this.minuteSynth.powerCurve(true) })
-        const pcvDown = this.minuteSynth.Dist({ c: this.minuteSynth.powerCurve(false) })
+        const pcvUp = this.m$.Dist({ c: this.m$.powerCurve(true) })
+        const pcvDown = this.m$.Dist({ c: this.m$.powerCurve(false) })
         fadeVal.$(pcvUp)
         fadeVal.$(pcvDown)
-        const gainA = this.minuteSynth.Gain({ g: pcvUp })
-        const gainB = this.minuteSynth.Gain({ g: pcvDown })
+        const gainA = this.m$.Gain({ g: pcvUp })
+        const gainB = this.m$.Gain({ g: pcvDown })
         this._addParam(new this.ParamAudio(gainA.z, r$))
         this._addParam(new this.ParamValue('A', gainA.z, A))
         this._addParam(new this.ParamValue('B', gainB.z, B))
@@ -988,7 +988,7 @@ class MinuteSynth {
        */
       on(onTime, freq) {
         if (!onTime) {
-          onTime = this.minuteSynth.now()
+          onTime = this.m$.now()
         }
         if (this.#prevFreq && this.p) {
           // Portamento control:
@@ -1038,13 +1038,13 @@ class MinuteSynth {
     // TODO: Allow inputs to be registrants
     const Module = class Voice extends this.BaseAmp {
       #modules = [] // Modules registered to receive on/off triggers
-      f = this.minuteSynth.Freq({p}) // Frequency control module. Set it by calling on().
+      f = this.m$.Freq({p}) // Frequency control module. Set it by calling on().
 
       constructor() {
         super(g)
         this._addParam(new this.ParamAudio(this.z, r$))
         this._$(this.f) // Attach frequency control to the voice
-        v && this.$(this.minuteSynth.ac.destination) // Attach voice to destination if v is true
+        v && this.$(this.m$.ac.destination) // Attach voice to destination if v is true
       }
 
       /**
