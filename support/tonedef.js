@@ -431,52 +431,6 @@ const ToneDefs = {
     off: 2.2,
     rec: 2.3
   },
-  chipArp: {
-    fn: m$ => {
-      // Demonstrates grabbing a tone definition and altering it. In this case, a
-      // m$.Prog is set up to make an arpeggio out of a "chip" tone.
-      const voice = ToneDefs.chip.fn(m$)
-
-      // Form a minor chord arpeggio, each lasting a 20th of a second:
-      const DUR = 0.05
-      const REPS = 16
-      const getFreqBase = (octave, offset) => 2**(((octave - 4) * 12 + offset) / 12)
-      const freqBases = [getFreqBase(4, 0), getFreqBase(4, 3), getFreqBase(4, 7)]
-      const freqs = []
-      const times = []
-      let t = -DUR
-      for (let i = 0; i < REPS; i++) {
-        freqs.push(...freqBases)
-        times.push(...freqBases.map(() => t += DUR))
-      }
-      const program = m$.Prog({ v: freqs, t: times })
-
-      // Then, get final frequency by multiplying freq. base with the voice's
-      // frequency generator. Make Gain now, hook up later.
-      const adjFreq = m$.Gain()
-
-      // Feed that in to the chip voice's freq. control, zeroing out the original
-      // assignment. (If I don't first detach, then original is added to this.)
-      // TODO: Find a better way to swap out a module without getting into the weeds
-      Array.from(voice.f._outParams).forEach(param => {
-        const target = param.synthModule
-        voice.f.detach(target)
-        adjFreq.$(target.f)
-      })
-
-      // Connect inputs to the gain module now because we're done removing old
-      // voice frequency control connections:
-      program.$(adjFreq)
-      voice.f.$(adjFreq.g)
-
-      // Now trigger the program:
-      voice.$(program)
-
-      return voice
-    },
-    off: 2.2,
-    rec: 2.3
-  },
   xfade: {
     fn: m$ => {
       const voice = m$.Voice()
@@ -645,33 +599,22 @@ const ToneDefs = {
 
       // Resources for programmed frequencies:
       const TONES = [
-          { freq: NOTES.cN, oct: 3, dur: 1/4 },
-          { freq: NOTES.eN, oct: 3, dur: 1/4 },
-          { freq: NOTES.cN, oct: 3, dur: 1/4 },
-          { freq: NOTES.gN, oct: 3, dur: 1/4 },
-          { freq: NOTES.cN, oct: 3, dur: 1/4 },
-          { freq: NOTES.cN, oct: 4, dur: 1/4 },
-          { freq: NOTES.bN, oct: 3, dur: 1/8 },
-          { freq: NOTES.aN, oct: 3, dur: 1/8 },
-          { freq: NOTES.gN, oct: 3, dur: 1/8 },
-          { freq: NOTES.aN, oct: 3, dur: 1/8 },
-          { freq: NOTES.gN, oct: 3, dur: 1/8 },
-          { freq: NOTES.fN, oct: 3, dur: 1/8 },
-          { freq: NOTES.eN, oct: 3, dur: 1/8 },
-          { freq: NOTES.fN, oct: 3, dur: 1/8 },
-          { freq: NOTES.eN, oct: 3, dur: 1/8 },
-          { freq: NOTES.dN, oct: 3, dur: 1/8 },
-          { freq: NOTES.cN, oct: 3, dur: 1/2 }
+          { freq: NOTES.cN, oct: 3, dur: 1/16 },
+          { freq: NOTES.dS, oct: 3, dur: 1/16 },
+          { freq: NOTES.gN, oct: 3, dur: 1/16 },
       ]
-      let timePoint = -(TONES[0].dur * WHOLE_DUR)
+      const REPEATS = 16
+      const tonesRep = Array(REPEATS).fill(TONES).flat()
+
+      let timePoint = -(tonesRep[0].dur * WHOLE_DUR)
       const program = m$.Prog({
           v: [ // Record all values; in this case, "frequency base" to signify note.
               // Each "frequency base" will be multiplied below by the voice frequency
               // generator to transpose to the key desired.
-              ...TONES.map(elem => getFreqBase(elem.oct, elem.freq))
+              ...tonesRep.map(elem => getFreqBase(elem.oct, elem.freq))
           ],
           t: [ // Times to set all value changes:
-              ...TONES.map(elem => timePoint += elem.dur * WHOLE_DUR),
+              ...tonesRep.map(elem => timePoint += elem.dur * WHOLE_DUR),
           ]
           // HINT: Add "p" parameter (e.g. p: 0.05) to glide between values!
       })
@@ -682,8 +625,8 @@ const ToneDefs = {
       const adjFreq = m$.Gain({ r$: program, g: voice.f })
 
       // Next, tone generation, etc.
-      const tone = m$.Osc({ t: m$.W.TRIANGLE, f: adjFreq, g: 0.5 })
-      const adsr = m$.ADSR({ d: 5, s: 0 }, voice) // Quick onset, slow decay
+      const tone = m$.Osc({ t: m$.W.TRIANGLE, f: adjFreq, g: 1/2 })
+      const adsr = m$.ADSR({ d: 2.5, s: 0, r: 1/4 }, voice) // Quick onset, slow decay
       const amp = m$.Gain({ r$: tone, g: adsr })
       amp.$(voice) // Plug amp output into voice
       voice.$(program) // Voice object triggers the program
