@@ -78,17 +78,17 @@ ADSR parameters (see the [Intro docs](intro.md#adsr-controls) for a diagram that
 
 ### Buf (Buffer)
 
-`Buf({ T: 1, c: 1, S: 1, g: 1, s: -1, F: AudioContext.samplerate, r: 1, d, n: 0, L, p, P }, t$)`
+`Buf({ T: 1, c: 1, S: 1, g: 1, s: -1, F: AudioContext.samplerate, r: 1, d, n: 0, f, L, p, P }, t$)`
 
-Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is the returned buffer's `.length`. Direct edits to the memory can be immediately heard. If using frequency control, this module automatically refreshes the underlying WebAudio `AudioBufferSource` so that repeated playing is possible.
+Buffer represents a block of memory that specifies samples. Access the memory with `.mem()`; the length of the buffer is the returned buffer's `.length`. Since `.mem()` provides a Float32 TypedArray, you can use `.set()` to quickly copy in values from your own array. Direct edits to the memory can be immediately heard. If using frequency control, this module automatically refreshes the underlying WebAudio `AudioBufferSource` so that repeated playing is possible.
 
-Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1` (default), `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate factor; `d:` detune; `n:` nominal playback frequency via the `.f` property (0 for no freq. control), `L:` enables looping if true, `p:` loop begin in seconds with respect to nominal frequency (default: 0), and `P:` loop end (default: end).
+Params: `T:` duration (non-patchable); `c:` channels (non-patchable); `S:` scale; `g:` gain; `s:` start time (`-1` (default), `0`, and greater as in "Osc" module; non-patchable); `F:` sampling rate (defaults to system default, non-patchable); `r:` playback rate factor; `d:` detune; `n:` nominal playback frequency (0 for no freq. control, non-patchable), `f:` to set a frequency (only works if `n:` was set), `L:` enables looping if true (non-patchable), `p:` loop begin in seconds with respect to nominal frequency (default: 0), and `P:` loop end (default: end).
 
 Pass in `t$` from a trigger source to trigger the buffer's playback.
 
 Methods:
 
-**`.mem(chan=0)`:** Returns an editable array that represents the sample buffer for the given channel. Generally, for "left" or "mono", `chan` should be `0`.
+**`.mem(chan=0)`:** Returns an editable Float32 array that represents the sample buffer for the given channel. Generally, for "left" or "mono", `chan` should be `0`.
 
 After instantiation, the `.s` property allows for on/off control with `.s.go(startTime)` and `.s.stop(startTime)` respectively. And, the `t$` reference will trigger the calling of `.on(onTime, freq)` and `.off(offTime)`.
 

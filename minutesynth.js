@@ -488,13 +488,14 @@ class MinuteSynth {
    * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
    * @param {number | undefined} n - nominal playback frequency (0 for no freq. control)
+   * @param {number | SynthModule | [] | undefined} f - frequency control (if n is specified)
    * @param {boolean | undefined} L - Enables looping if set to true
    * @param {number | undefined} p - Loop begin in seconds with respect to nominal frequency (default: 0)
    * @param {number | undefined} P - Loop end in seconds with respect to nominal frequency (default: end)
    * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
    * @returns {SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0, L, p, P }, t$) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0, f, L, p, P }, t$) {
     const Module = class Buf extends this.BaseAmp {
       b = this.m$.ac.createBuffer(c, ~~(F * T), F)
       B = this.m$.ac.createBufferSource()
@@ -507,11 +508,10 @@ class MinuteSynth {
 
       constructor() {
         super(g)
-        console.log(`Start parameter: ${s}`)
         this._addParam(new this.ParamStart(this.B, s))
         this._addParam(new this.ParamValue('d', this.B.detune, d))
         if (n) {
-          this.#fGain = this._addFreqHelper(this.B.playbackRate, n)
+          this.#fGain = this._addFreqHelper(this.B.playbackRate, f ? f : n)
         }
         else {
           this._addParam(new this.ParamValue('r', this.B.playbackRate, r))

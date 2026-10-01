@@ -654,75 +654,28 @@ const ToneDefs = {
     off: 10,
     rec: 10
   },
-  zzFx1: {
-    fn: async function(m$) {
-      // Example of using Frank Force's ZzFx generation output as a buffered
-      // playback within the MinuteSynth framework. First, here is a copy of the
-      // ZzFxMicro.min.js code that you would typically include in your HTML:
+  zzFx: {
+    fn: m$ => {
+      // Example of playing ZzFx sounds by using a slightly modified version:
       // -----
       let // ZzFXMicro - Zuper Zmall Zound Zynth - v1.3.2 by Frank Force
       zzfxV=.3,               // volume
-      zzfxX=new AudioContext, // audio context
-      zzfx=                   // play sound
-      (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0,N=0)=>{let M=Math,d=2*M.PI,R=44100,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,H=0,a=0,n=1,I=0,J=0,f=0,h=N<0?-1:1,x=d*h*N*2/R,L=M.cos(x),Z=M.sin,K=Z(x)/4,O=1+K,X=-2*L/O,Y=(1-K)/O,P=(1+h*L)/2/O,Q=-(h+L)/O,S=P,T=0,U=0,V=0,W=0;e=R*e+9;m*=R;r*=R;t*=R;c*=R;y*=500*d/R**3;A*=d/R;v*=d/R;z*=R;l=R*l|0;p*=zzfxV;for(h=e+m+r+t+c|0;a<h;k[a++]=f*p)++J%(100*F|0)||(f=q?1<q?2<q?3<q?4<q?(g/d%1<D/2)*2-1:Z(g**3):M.max(M.min(M.tan(g),1),-1):1-(2*g/d%2+2)%2:1-4*M.abs(M.round(g/d)-g/d):Z(g),f=(l?1-B+B*Z(d*a/l):1)*(4<q?s:(f<0?-1:1)*M.abs(f)**D)*(a<e?a/e:a<e+m?1-(a-e)/m*(1-w):a<e+m+r?w:a<h-c?(h-a-c)/t*w:0),f=c?f/2+(c>a?0:(a<h-c?1:(h-a)/c)*k[a-c|0]/2/p):f,N?f=W=S*T+Q*(T=U)+P*(U=f)-Y*V-X*(V=W):0),x=(b+=u+=y)*M.cos(A*H++),g+=x+x*E*Z(a**5),n&&++n>z&&(b+=v,C+=v,n=0),!l||++I%l||(b=C,u=G,n=n||1);X=zzfxX,p=X.createBuffer(1,h,R);p.getChannelData(0).set(k);b=X.createBufferSource();b.buffer=p;b.connect(X.destination);b.start()}
+      /* zzfxX=new AudioContext, // audio context */
+      zzfx=                   /* // play sound */ // return sound buffer
+      (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0,N=0)=>{let M=Math,d=2*M.PI,R=44100,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,H=0,a=0,n=1,I=0,J=0,f=0,h=N<0?-1:1,x=d*h*N*2/R,L=M.cos(x),Z=M.sin,K=Z(x)/4,O=1+K,X=-2*L/O,Y=(1-K)/O,P=(1+h*L)/2/O,Q=-(h+L)/O,S=P,T=0,U=0,V=0,W=0;e=R*e+9;m*=R;r*=R;t*=R;c*=R;y*=500*d/R**3;A*=d/R;v*=d/R;z*=R;l=R*l|0;p*=zzfxV;for(h=e+m+r+t+c|0;a<h;k[a++]=f*p)++J%(100*F|0)||(f=q?1<q?2<q?3<q?4<q?(g/d%1<D/2)*2-1:Z(g**3):M.max(M.min(M.tan(g),1),-1):1-(2*g/d%2+2)%2:1-4*M.abs(M.round(g/d)-g/d):Z(g),f=(l?1-B+B*Z(d*a/l):1)*(4<q?s:(f<0?-1:1)*M.abs(f)**D)*(a<e?a/e:a<e+m?1-(a-e)/m*(1-w):a<e+m+r?w:a<h-c?(h-a-c)/t*w:0),f=c?f/2+(c>a?0:(a<h-c?1:(h-a)/c)*k[a-c|0]/2/p):f,N?f=W=S*T+Q*(T=U)+P*(U=f)-Y*V-X*(V=W):0),x=(b+=u+=y)*M.cos(A*H++),g+=x+x*E*Z(a**5),n&&++n>z&&(b+=v,C+=v,n=0),!l||++I%l||(b=C,u=G,n=n||1);/* X=zzfxX,p=X.createBuffer(1,h,R);p.getChannelData(0).set(k);b=X.createBufferSource();b.buffer=p;b.connect(X.destination);b.start() */
+        /* ADDED THIS --> */ return k }
       // -----
-
-      // Now, after including that stuff above, replace the AudioContext for buffering:
-      const DUR_SECONDS = 1.1
-      const ZZ_FREQ = 440
-      zzfxX = new OfflineAudioContext(1, ~~(m$.ac.sampleRate * DUR_SECONDS), m$.ac.sampleRate)
+      // NOTE: For purposes of this demo, I am grabbing the zzfx buffer k so I
+      // can use it with MinuteSynth. /* Some ZzFXMicro code is commented out! */
 
       // Run a ZzFx call that I made in https://killedbyapixel.github.io/ZzFX/
-      zzfx(...[.8,.1,ZZ_FREQ,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
+      const k = zzfx(...[.8,.1,,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
 
-      // Grab buffer contents and run with it:
-      const renderedBuffer = await zzfxX.startRendering()
-      const srcBuf = renderedBuffer.getChannelData(0)
-      // (It could have also been possible to create a special version of ZzFx that
-      // allows me access to the generated buffer "k")
-
-      // At this time, I'll set up my MinuteSynth stuff, but it can be done anywhere:
-      const tgtBuf = m$.Buf({ T: DUR_SECONDS, n: ZZ_FREQ })
-      const mem = tgtBuf.mem()
-      const bufLen = Math.min(srcBuf.length, mem.length)
-      for (let i = 0; i < bufLen; i++) {
-        mem[i] = srcBuf[i]
-      }
-
-      // Set up output voice, and connect my MinuteSynth module buffer to it:
+      // Now build up buffered playback:
       const voice = m$.Voice({ g: 2 })
-      voice.rg(tgtBuf)
-      voice.f.$(tgtBuf.f) // Hook up frequency control, too
-      tgtBuf.$(voice)
-      return voice
-    },
-    off: 2,
-    rec: 2
-  },
-  zzFx2: {
-    fn: async function(m$) {
-      // Example of playing ZzFx sounds by calling zzfx() directly with triggering:
-      // -----
-      let // ZzFXMicro - Zuper Zmall Zound Zynth - v1.3.2 by Frank Force
-      zzfxV=.3,               // volume
-      zzfxX=new AudioContext, // audio context
-      zzfx=                   // play sound
-      (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0,N=0)=>{let M=Math,d=2*M.PI,R=44100,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,H=0,a=0,n=1,I=0,J=0,f=0,h=N<0?-1:1,x=d*h*N*2/R,L=M.cos(x),Z=M.sin,K=Z(x)/4,O=1+K,X=-2*L/O,Y=(1-K)/O,P=(1+h*L)/2/O,Q=-(h+L)/O,S=P,T=0,U=0,V=0,W=0;e=R*e+9;m*=R;r*=R;t*=R;c*=R;y*=500*d/R**3;A*=d/R;v*=d/R;z*=R;l=R*l|0;p*=zzfxV;for(h=e+m+r+t+c|0;a<h;k[a++]=f*p)++J%(100*F|0)||(f=q?1<q?2<q?3<q?4<q?(g/d%1<D/2)*2-1:Z(g**3):M.max(M.min(M.tan(g),1),-1):1-(2*g/d%2+2)%2:1-4*M.abs(M.round(g/d)-g/d):Z(g),f=(l?1-B+B*Z(d*a/l):1)*(4<q?s:(f<0?-1:1)*M.abs(f)**D)*(a<e?a/e:a<e+m?1-(a-e)/m*(1-w):a<e+m+r?w:a<h-c?(h-a-c)/t*w:0),f=c?f/2+(c>a?0:(a<h-c?1:(h-a)/c)*k[a-c|0]/2/p):f,N?f=W=S*T+Q*(T=U)+P*(U=f)-Y*V-X*(V=W):0),x=(b+=u+=y)*M.cos(A*H++),g+=x+x*E*Z(a**5),n&&++n>z&&(b+=v,C+=v,n=0),!l||++I%l||(b=C,u=G,n=n||1);X=zzfxX,p=X.createBuffer(1,h,R);p.getChannelData(0).set(k);b=X.createBufferSource();b.buffer=p;b.connect(X.destination);b.start()}
-      // -----
-
-      // Now, after including that stuff above, prepare to receive triggers:
-      zzfxX = m$.ac // Use the MinuteSynth AudioContext
-      const voice = m$.Voice()
-      // Register trigger dest. with the voice:
-      voice.rg({
-        on(_, freq) {
-          if (freq) {
-            // Run a ZzFx call that I made in https://killedbyapixel.github.io/ZzFX/
-            zzfx(...[.8,.1,freq,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
-          }
-          // Ignore if frequency is undefined.
-        }
-      })
+      const buf = m$.Buf({ T: k.length / 44100, F: 44100, n: 220, f: voice.f, L: true }, voice)
+      buf.mem().set(k)
+      buf.$(voice)
       return voice
     },
     off: 2,
