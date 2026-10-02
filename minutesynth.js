@@ -117,6 +117,7 @@ class MinuteSynth {
           if (!isNaN(module)) {
             module = this.sMod.m$.C(module)
           }
+          console.assert(module instanceof SynthModule, "Module must be an instance of SynthModule")
           this._inModules.push(module)
           if (module._$(this.obj)) {
             this.z0 && this.z0()
@@ -127,19 +128,22 @@ class MinuteSynth {
 
       /**
        * Remove an incoming connection by incoming module reference, or all if no parameter specified
-       * @param {SynthModule | undefined} inModule 
+       * @param {SynthModule | undefined} inModule
+       * @returns {boolean} True if the detach was successful
        */
       detach(inModule) {
+        let success = true
+        console.assert(!inModule || inModule instanceof SynthModule, "inModule must be an instance of SynthModule or undefined/null")
         for (let module of [...this._inModules]) { // Iterate over copy
           if (!inModule || (module === inModule)) {
             [].concat(this.obj).forEach(obj => {
               try {
                 module.z.disconnect(obj)
-              } catch (_) {}})
+              } catch (_) {success = false}})
             inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
-            // TODO: Return true if detach was successful
           }
         }
+        return success
       }
     })(this)
 
@@ -231,7 +235,6 @@ class MinuteSynth {
        * @param {number | undefined} startTime 
        */
       go(startTime = 0) {
-        console.log(`Start time: ${startTime}`)
         this.obj.start((startTime == 0) ? this.sMod.m$.now() : startTime)
       }
 
@@ -240,7 +243,6 @@ class MinuteSynth {
        * @param {number | undefined} stopTime 
        */
       stop(stopTime = 0) {
-        console.log(`Stop time: ${stopTime}`)
         this.obj.stop((stopTime == 0) ? this.sMod.m$.now() : stopTime)
         // TODO: Consider scheduling an object detach() at stopTime
       }
@@ -263,8 +265,10 @@ class MinuteSynth {
       // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
       let param = tgtThing
       if (tgtThing._params) {
+        console.assert(tgtThing instanceof SynthModule, "tgtThing must be an instance of SynthModule")
         param = tgtThing._params[tgtParamName || 'in']
       }
+      console.assert(param.sMod && param.sMod instanceof SynthModule, "Invalid target parameter")
       param.r$(this)
       this._outParams.push(param)
       return tgtThing // Allows chaining of commands
@@ -281,6 +285,7 @@ class MinuteSynth {
           // If the source module is a number, then wrap it in a "C" module:
           module = this.m$.C(module)
         }
+        console.assert(module instanceof SynthModule, "Source module must be an instance of SynthModule")
         module.$(this, thisParamName)
       })
       return this
@@ -303,17 +308,21 @@ class MinuteSynth {
      * If no parameters are specified, then all outgoing connections are removed.
      * @param {SynthModule | null | undefined} tgtModule 
      * @param {string | null | undefined} paramName 
+     * @returns {Param[]} An array of parameters that were detached.
      */
     detach(tgtModule, paramName) {
+      const ret = []
+      console.assert(!tgtModule || tgtModule instanceof SynthModule, "tgtModule must be an instance of SynthModule or undefined/null")
       for (let param of [...this._outParams]) {
-        if (!tgtModule || (param.synthModule === tgtModule)) {
+        if (!tgtModule || (param.sMod === tgtModule)) {
           if (!paramName || (param.name === paramName)) {
             param.detach(this)
             this._outParams.splice(this._outParams.indexOf(param), 1)
+            ret.push(param)
           }
         }
       }
-      // TODO: Return modules that were detached. Helps chipArp tonedef.
+      return ret
     }
 
     /**
@@ -378,6 +387,7 @@ class MinuteSynth {
     renew(node, newNode) {
       // Function to return the key (attribute) name that a given object (value) is stored under
       // whether own or from prototype, or undefined
+      // TODO: This can be simplified by keeping a map of connections
       const getKeyByValue = (object, value) => {
         for (let key in object) {
           if (object[key] === value) {
@@ -391,7 +401,7 @@ class MinuteSynth {
         if (key) {
           let foundFlag = false
           param._inModules.forEach(module => {
-            const inParam = module._outParams.find(p => p.obj === this.obj)
+            const inParam = module._outParams.find(p => p.obj === param.obj)
             if (inParam) {
               if (!foundFlag) {
                 newNode[key].value = 0
@@ -435,22 +445,21 @@ class MinuteSynth {
     SINE: 1,
     SQUARE: 2,
     SAWTOOTH: 3,
-    TRIANGLE: 4,
-    CUSTOM: 5
+    TRIANGLE: 4
   })
 
   /**
    * Osc (Oscillaor) is a simple tone generator. Specify its type and also
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
-   * @param {number | string} t - Type of waveform, can use W lookup
+   * @param {number | string} t - Type of waveform, can use W lookup; don't set if using r and i arrays
    * @param {number | undefined} S - scale (default: 1)
    * @param {number | SynthModule | []} f - default frequency
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
-   * @param {Float32Array | undefined} r - real values
-   * @param {Float32Array | undefined} i - imag. values
+   * @param {Float32Array | undefined} r - real values for custom wave
+   * @param {Float32Array | undefined} i - imag. values for custom wave
    * @param {number | undefined} n - nominal playback frequncy (for custom waveform)
    * @returns {SynthModule} An instance of an oscillator module
    */
@@ -462,11 +471,13 @@ class MinuteSynth {
       constructor() {
         super(g)
         if (t) {
-          this.o.type = isNaN(t) ? t : ['sine', 'square', 'sawtooth', 'triangle', 'custom'][t - 1]
+          this.o.type = isNaN(t) ? t : t = ['sine', 'square', 'sawtooth', 'triangle'][t - 1]
+          console.assert(this.o.type === t, "Invalid waveform type assigned to oscillator")
         }
         if (r) {
           this.o.setPeriodicWave(this.m$.ac.createPeriodicWave(r, i))
         }
+        console.assert(!(t && r), "Cannot specify both waveform type and custom periodic wave")
         this._addParam(new this.ParamStart(this.o, s))
         this._addParam(new this.ParamValue('d', this.o.detune, d))
         this._addFreqHelper(this.o.frequency, f)
@@ -536,7 +547,6 @@ class MinuteSynth {
         if (onTime < nowTime) {
           onTime = nowTime
         }
-        console.log(`Buffer on at ${onTime}${onTime == nowTime ? ' (now)' : ''} with freq ${freq}`)
         if (this.#autoMode) {
           // We are playing already. Must stop and refresh first.
           this.B.stop(onTime)
@@ -565,7 +575,6 @@ class MinuteSynth {
         if (offTime < nowTime) {
           offTime = nowTime
         }
-        console.log(`Buffer off at: ${offTime}${offTime == nowTime ? ' (now)' : ''}`)
         if (!this.#autoMode) {
           // If we didn't start with an "on", then stop immediately.
           this.B.stop()
@@ -600,7 +609,6 @@ class MinuteSynth {
        * This is needed because the ending of a BufferSource renders it unusable.
        */
       renew(freq) {
-        console.log('Renewing buffer source')
         this.#autoMode = false
         this.B = super.renew(this.B, this.m$.ac.createBufferSource())
         this.#applyAttrs(freq)
@@ -714,7 +722,8 @@ class MinuteSynth {
       _calcSCRate = () => S
       constructor() {
         super(g)
-        this.q.type = isNaN(t) ? t : ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
+        this.q.type = isNaN(t) ? t : t = ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
+        console.assert(this.q.type === t, "Invalid filter type specified")
         this._addParam(new this.ParamAudio(this.q, r$))
         this._addParam(new this.ParamValue('Q', this.q.Q, q))
         this._addParam(new this.ParamValue('b', this.q.gain, b))

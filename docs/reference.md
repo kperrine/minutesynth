@@ -199,7 +199,7 @@ Oscillaor is a simple tone generator. Specify its type and also scale, which can
 
 Params: `t:` type (non-patchable parameter); `S:` scale (non-patchable parameter); `f:` default frequency, or patch from another module that serves as frequency input; `d:` detune, `g:` gain; `s:` start time (non-patchable parameter)
 
-More esoteric parameters: `r:` real values array; `i:` imag. values array, `n:` nominal playback frequncy (for custom waveform; non-patchable parameter)
+More esoteric parameters: `r:` real values array; `i:` imag. values array (don't set `t:` if using these), `n:` nominal playback frequncy (for custom waveform; non-patchable parameter)
 
 The type `t:` parameter must take one of these values:
 
@@ -209,7 +209,6 @@ The type `t:` parameter must take one of these values:
 | m$.W.SQUARE | 2 | 'square' |
 | m$.W.SAWTOOTH | 3 | 'sawtooth' |
 | m$.W.TRIANGLE | 4 | 'triangle' |
-| m$.W.CUSTOM | 5 | 'custom' |
 
 The start `s:` parameter may take:
 
