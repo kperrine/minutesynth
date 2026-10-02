@@ -1,13 +1,17 @@
+/**
+ * MinuteSynth: A small-scale library to ease the use of the WebAudio API
+ *
+ * Docs, examples, usage, license: https://github.com/kperrine/minutesynth
+ */
 "use strict";
 
-// Universal audio cotext reference:
-
 // ACX is a reference to the AudioContext class, for creating AudioContext objects.
-var ACX = window.AudioContext || window.webkitAudioContext
+const ACX = window.AudioContext || window.webkitAudioContext
 
+/**
+ * Class/namespace for MinuteSynth tied to a single AudioContext
+ */
 class MinuteSynth {
-  // Represents Attack, Decay, Sustain, Release parameterized curve.
-  // The default ADSR parameters lets the tone stay on until it is shut off.
   static ADSRParams = class {
     /**
      * Creates an ADSR (Attack, Decay, Sustain, Release) parameterization
@@ -26,14 +30,10 @@ class MinuteSynth {
     }
   }
 
-  static DEFAULT_ADSR = new MinuteSynth.ADSRParams()
-
   /**
-   * Sample rate that is provided by the AudioContext. By default, it is 44100 Hz.
-   * @type {number}
-   * @readonly
+   * Default ADSR for preloading parameters that aren't otherwise redefined
    */
-  sampleRate
+  static DEFAULT_ADSR = new MinuteSynth.ADSRParams()
 
   /**
    * AudioContext object that is to be used to produce WebAudio objects.
@@ -46,7 +46,7 @@ class MinuteSynth {
    * Length of noise sample in seconds. Equates to seconds * sampleRate samples.
    * @type {number}
    */
-  NOISE_LEN = 1.0
+  noiseLen = 1.0
 
   /**
    * Constructs a MinuteSynth instance tied to the given AudioContext.
@@ -54,7 +54,6 @@ class MinuteSynth {
    */
   constructor(ac = new ACX()) {
     this.ac = ac
-    this.sampleRate = ac.sampleRate
   }
 
   /**
@@ -66,7 +65,7 @@ class MinuteSynth {
      * minuteSynth is a reference to the parent MinuteSynth instance
      * @type {MinuteSynth}
      */
-    minuteSynth = parent
+    m$ = parent
 
     /**
      * collection of parameters for this module
@@ -92,7 +91,7 @@ class MinuteSynth {
       _inModules
 
       /** @type {SynthModule} */
-      synthModule = parent
+      sMod = parent
 
       /**
        * Cretes a parameter that allows for attachment to another module
@@ -116,8 +115,9 @@ class MinuteSynth {
       r$(srcModules) {
         for (let module of [].concat(srcModules)) {
           if (!isNaN(module)) {
-            module = this.synthModule.minuteSynth.C(module)
+            module = this.sMod.m$.C(module)
           }
+          console.assert(module instanceof SynthModule, "Module must be an instance of SynthModule")
           this._inModules.push(module)
           if (module._$(this.obj)) {
             this.z0 && this.z0()
@@ -128,18 +128,22 @@ class MinuteSynth {
 
       /**
        * Remove an incoming connection by incoming module reference, or all if no parameter specified
-       * @param {SynthModule | undefined} inModule 
+       * @param {SynthModule | undefined} inModule
+       * @returns {boolean} True if the detach was successful
        */
       detach(inModule) {
+        let success = true
+        console.assert(!inModule || inModule instanceof SynthModule, "inModule must be an instance of SynthModule or undefined/null")
         for (let module of [...this._inModules]) { // Iterate over copy
           if (!inModule || (module === inModule)) {
             [].concat(this.obj).forEach(obj => {
               try {
                 module.z.disconnect(obj)
-              } catch (_) {}})
+              } catch (_) {success = false}})
             inModule && this._inModules.splice(this._inModules.indexOf(inModule), 1)
           }
         }
+        return success
       }
     })(this)
 
@@ -207,8 +211,10 @@ class MinuteSynth {
       }
     }
 
-    // ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
-    // -1 to defer starting, 0 to autostart now, and other to start at specified time.
+    /**
+     * ParamStart allows access to the start/stop methods, exposed as 's'. Set startTime to:
+     * -1 to defer starting, 0 to autostart now, and other to start at specified time.
+     */
     ParamStart = class extends this.Param {
       /**
        * Cretes a parameter that allows for start/stop control
@@ -229,8 +235,7 @@ class MinuteSynth {
        * @param {number | undefined} startTime 
        */
       go(startTime = 0) {
-        console.log(`Start time: ${startTime}`)
-        this.obj.start((startTime == 0) ? this.synthModule.minuteSynth.now() : startTime)
+        this.obj.start((startTime == 0) ? this.sMod.m$.now() : startTime)
       }
 
       /**
@@ -238,8 +243,7 @@ class MinuteSynth {
        * @param {number | undefined} stopTime 
        */
       stop(stopTime = 0) {
-        console.log(`Stop time: ${stopTime}`)
-        this.obj.stop((stopTime == 0) ? this.synthModule.minuteSynth.now() : stopTime)
+        this.obj.stop((stopTime == 0) ? this.sMod.m$.now() : stopTime)
         // TODO: Consider scheduling an object detach() at stopTime
       }
     }
@@ -256,13 +260,15 @@ class MinuteSynth {
       // if param exists in this, add index to it, e.g. "g2". That would allow for easier manipulation
       // of params from one location.
       if (tgtThing instanceof AudioNode) {
-        tgtThing = this.minuteSynth.ACN(tgtThing)
+        tgtThing = this.m$.ACN(tgtThing)
       }
       // TODO: Allow "tgtThing" to be an array if multiple forward patches need to be made.
       let param = tgtThing
       if (tgtThing._params) {
+        console.assert(tgtThing instanceof SynthModule, "tgtThing must be an instance of SynthModule")
         param = tgtThing._params[tgtParamName || 'in']
       }
+      console.assert(param.sMod && param.sMod instanceof SynthModule, "Invalid target parameter")
       param.r$(this)
       this._outParams.push(param)
       return tgtThing // Allows chaining of commands
@@ -277,8 +283,9 @@ class MinuteSynth {
       [].concat(srcModules).forEach(module => {
         if (!isNaN(module)) {
           // If the source module is a number, then wrap it in a "C" module:
-          module = this.minuteSynth.C(module)
+          module = this.m$.C(module)
         }
+        console.assert(module instanceof SynthModule, "Source module must be an instance of SynthModule")
         module.$(this, thisParamName)
       })
       return this
@@ -301,16 +308,21 @@ class MinuteSynth {
      * If no parameters are specified, then all outgoing connections are removed.
      * @param {SynthModule | null | undefined} tgtModule 
      * @param {string | null | undefined} paramName 
+     * @returns {Param[]} An array of parameters that were detached.
      */
     detach(tgtModule, paramName) {
+      const ret = []
+      console.assert(!tgtModule || tgtModule instanceof SynthModule, "tgtModule must be an instance of SynthModule or undefined/null")
       for (let param of [...this._outParams]) {
-        if (!tgtModule || (param.synthModule === tgtModule)) {
+        if (!tgtModule || (param.sMod === tgtModule)) {
           if (!paramName || (param.name === paramName)) {
             param.detach(this)
             this._outParams.splice(this._outParams.indexOf(param), 1)
+            ret.push(param)
           }
         }
       }
+      return ret
     }
 
     /**
@@ -332,7 +344,7 @@ class MinuteSynth {
         [].concat(param._defVal).forEach(element => {
           if (!isNaN(element)) {
             // If a plain number was given in an array, then wrap it in a "C" module:
-            element = this.minuteSynth.C(element)
+            element = this.m$.C(element)
           }
           element.$(param)
         })
@@ -348,12 +360,11 @@ class MinuteSynth {
      */
     _addFreqHelper(control, defVal) {
       control.value = 0
-      const gainModule = this.minuteSynth.Gain()
+      const gainModule = this.m$.Gain()
       if (!isNaN(defVal)) {
         // If the default value is a number, then create a constant for it:
-        const freqC = this.minuteSynth.C(defVal)
+        const freqC = this.m$.C(defVal)
         // TODO: Inherit the parameters rather than recreating.
-console.log(`Adding frequency helper with defVal ${defVal}`)
         this._addParam(new this.ParamValue('f', freqC.z.offset, defVal))
         freqC.$(gainModule)
       }
@@ -361,7 +372,6 @@ console.log(`Adding frequency helper with defVal ${defVal}`)
         // TODO: Inherit the parameters rather than recreating.
         this._addParam(new this.ParamValue('f', gainModule.z, defVal))
       }
-console.log(`Frequency helper rate: ${this._calcSCRate()}`)
       this._addParam(new this.ParamValue('S', gainModule.z.gain, this._calcSCRate()))
       gainModule.z.connect(control)
       return gainModule
@@ -372,10 +382,12 @@ console.log(`Frequency helper rate: ${this._calcSCRate()}`)
      * @param {AudioNode} node - The old AudioNode to replace
      * @param {AudioNode} newNode - The AudioNode to replace. (Sorry, can't discern from the old one.)
      * @return {AudioNode} The new AudioNode that is now attached to this module's parameters.
+     * TODO: See if this is easier if we renew by SynthModule instead of AudioNode
      */
     renew(node, newNode) {
       // Function to return the key (attribute) name that a given object (value) is stored under
       // whether own or from prototype, or undefined
+      // TODO: This can be simplified by keeping a map of connections
       const getKeyByValue = (object, value) => {
         for (let key in object) {
           if (object[key] === value) {
@@ -384,15 +396,13 @@ console.log(`Frequency helper rate: ${this._calcSCRate()}`)
         }
       }
 
-console.log(`Param-level renew for ${node.constructor.name} in ${this.constructor.name}`)
       Object.values(this._params).forEach(param => {
         const key = getKeyByValue(node, param.obj)
         if (key) {
           let foundFlag = false
           param._inModules.forEach(module => {
-            const inParam = module._outParams.find(p => p.obj === this.obj)
+            const inParam = module._outParams.find(p => p.obj === param.obj)
             if (inParam) {
-console.log(`Reconnecting Parameter ${inParam.name} via ${key}`)
               if (!foundFlag) {
                 newNode[key].value = 0
                 foundFlag = true
@@ -403,7 +413,6 @@ console.log(`Reconnecting Parameter ${inParam.name} via ${key}`)
           param.obj = newNode[key]
         }
         else if (param.obj === node) {
-console.log(`Reconnecting main audio input ${param.name}`)
           param.obj = newNode
         }
       })
@@ -424,7 +433,7 @@ console.log(`Reconnecting main audio input ${param.name}`)
      */
     constructor(gainVal = 1) {
       super()
-      this.z = this.minuteSynth.ac.createGain()
+      this.z = this.m$.ac.createGain()
       this._addParam(new this.ParamValue('g', this.z.gain, gainVal))
     }
   }
@@ -436,38 +445,39 @@ console.log(`Reconnecting main audio input ${param.name}`)
     SINE: 1,
     SQUARE: 2,
     SAWTOOTH: 3,
-    TRIANGE: 4,
-    CUSTOM: 5
+    TRIANGLE: 4
   })
 
   /**
    * Osc (Oscillaor) is a simple tone generator. Specify its type and also
    * scale, which can transform the incoming base frequency when the module is
    * triggered. Specify r and i arrays for periodic wave.
-   * @param {number | string} t - Type of waveform, can use W lookup
+   * @param {number | string} t - Type of waveform, can use W lookup; don't set if using r and i arrays
    * @param {number | undefined} S - scale (default: 1)
    * @param {number | SynthModule | []} f - default frequency
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
-   * @param {Float32Array | undefined} r - real values
-   * @param {Float32Array | undefined} i - imag. values
+   * @param {Float32Array | undefined} r - real values for custom wave
+   * @param {Float32Array | undefined} i - imag. values for custom wave
    * @param {number | undefined} n - nominal playback frequncy (for custom waveform)
    * @returns {SynthModule} An instance of an oscillator module
    */
   Osc({ t, S = 1, f = 440, d, g = 1, s = 0, r, i, n = 1 }) {
     const Module = class Osc extends this.BaseAmp {
-      o = this.minuteSynth.ac.createOscillator()
+      o = this.m$.ac.createOscillator()
       _calcSCRate = () => S / n
 
       constructor() {
         super(g)
         if (t) {
-          this.o.type = isNaN(t) ? t : ['sine', 'square', 'sawtooth', 'triangle', 'custom'][t - 1]
+          this.o.type = isNaN(t) ? t : t = ['sine', 'square', 'sawtooth', 'triangle'][t - 1]
+          console.assert(this.o.type === t, "Invalid waveform type assigned to oscillator")
         }
         if (r) {
-          this.o.setPeriodicWave(this.minuteSynth.ac.createPeriodicWave(r, i))
+          this.o.setPeriodicWave(this.m$.ac.createPeriodicWave(r, i))
         }
+        console.assert(!(t && r), "Cannot specify both waveform type and custom periodic wave")
         this._addParam(new this.ParamStart(this.o, s))
         this._addParam(new this.ParamValue('d', this.o.detune, d))
         this._addFreqHelper(this.o.frequency, f)
@@ -489,16 +499,17 @@ console.log(`Reconnecting main audio input ${param.name}`)
    * @param {number | SynthModule | [] | undefined} r - playback rate (default: 1)
    * @param {number | SynthModule | [] | undefined} d - detune (default: 0)
    * @param {number | undefined} n - nominal playback frequency (0 for no freq. control)
+   * @param {number | SynthModule | [] | undefined} f - frequency control (if n is specified)
    * @param {boolean | undefined} L - Enables looping if set to true
    * @param {number | undefined} p - Loop begin in seconds with respect to nominal frequency (default: 0)
    * @param {number | undefined} P - Loop end in seconds with respect to nominal frequency (default: end)
    * @param {SynthModule | undefined} t$ - Optional trigger input for this module.
    * @returns {SynthModule} An instance of a buffer module
    */
-  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0, L, p, P }, t$) {
+  Buf({ T = 1, c = 1, S = 1, g = 1, s = -1, F = this.ac.sampleRate, r = 1, d, n = 0, f, L, p, P }, t$) {
     const Module = class Buf extends this.BaseAmp {
-      b = this.minuteSynth.ac.createBuffer(c, ~~(F * T), F)
-      B = this.minuteSynth.ac.createBufferSource()
+      b = this.m$.ac.createBuffer(c, ~~(F * T), F)
+      B = this.m$.ac.createBufferSource()
       L = L
       p = p
       P = P
@@ -508,12 +519,10 @@ console.log(`Reconnecting main audio input ${param.name}`)
 
       constructor() {
         super(g)
-        console.log(`Start parameter: ${s}`)
         this._addParam(new this.ParamStart(this.B, s))
         this._addParam(new this.ParamValue('d', this.B.detune, d))
-console.log(`BUF: Rate parameter: ${r}, nominal freq: ${n}`)
         if (n) {
-          this.#fGain = this._addFreqHelper(this.B.playbackRate, n)
+          this.#fGain = this._addFreqHelper(this.B.playbackRate, f ? f : n)
         }
         else {
           this._addParam(new this.ParamValue('r', this.B.playbackRate, r))
@@ -531,22 +540,19 @@ console.log(`BUF: Rate parameter: ${r}, nominal freq: ${n}`)
        * @param {number} freq - If specified, used to calculate the playback rate
        */
       on(onTime, freq) {
-        const nowTime = this.minuteSynth.now()
+        const nowTime = this.m$.now()
         if (!onTime) {
           onTime = nowTime
         }
         if (onTime < nowTime) {
           onTime = nowTime
         }
-        console.log(`Buffer on at ${onTime}${onTime == nowTime ? ' (now)' : ''} with freq ${freq}`)
         if (this.#autoMode) {
           // We are playing already. Must stop and refresh first.
-console.log(`Preemptive stop at: ${onTime}`)
           this.B.stop(onTime)
         }
         setTimeout(() => {
           if (this.#autoMode) {
-console.log('Auto-renewing')
             this.renew(freq)
           }
           else {
@@ -562,14 +568,13 @@ console.log('Auto-renewing')
        * @param {number | undefined} offTime - The time at which to start the release action.
        */
       off(offTime) {
-        const nowTime = this.minuteSynth.now()
+        const nowTime = this.m$.now()
         if (offTime == null) {
           offTime = nowTime
         }
         if (offTime < nowTime) {
           offTime = nowTime
         }
-        console.log(`Buffer off at: ${offTime}${offTime == nowTime ? ' (now)' : ''}`)
         if (!this.#autoMode) {
           // If we didn't start with an "on", then stop immediately.
           this.B.stop()
@@ -604,9 +609,8 @@ console.log('Auto-renewing')
        * This is needed because the ending of a BufferSource renders it unusable.
        */
       renew(freq) {
-        console.log('Renewing buffer source')
         this.#autoMode = false
-        this.B = super.renew(this.B, this.minuteSynth.ac.createBufferSource())
+        this.B = super.renew(this.B, this.m$.ac.createBufferSource())
         this.#applyAttrs(freq)
         if (this.#fGain) {
           this.B.playbackRate.value = 0
@@ -629,64 +633,6 @@ console.log('Auto-renewing')
   }
 
   /**
-   * Trig is a helper class that translates a triggering action to an ES6/browser
-   * Window timeout that is called to a trig() method to be implemented.
-   */
-  Trig = class Trig extends this.SynthModule {
-    #triggered = false
-
-    /**
-     * Called by a trigger source (e.g. Voice) to schedule an activation
-     * @param {number | undefined} onTime - The time WRT AudioContext at which to start the play action; 0 for immmediate.
-     * @param {number | undefined} freq - Frequency value passed along with the triggering event
-     */
-    on(onTime, freq) {
-      const nowTime = this.minuteSynth.now()
-      if (onTime != null && onTime < nowTime) {
-        onTime = 0
-      }
-      if (this.#triggered) {
-        this.off() // Call off now and do synchronous action
-      }
-      const func = () => {
-        this.#triggered = true
-        this.trig(freq)
-      }
-      if (onTime) {
-        setTimeout(func, (onTime - nowTime) * 1000)
-      }
-      else {
-        func() // Keep trig() call in sync if onTime is now.
-      }
-    }
-
-    /**
-     * Called by a trigger source (e.g. Voice) to schedule deactivation
-     * @param {number | undefined} offTime - The time WRT AudioContext at which to start the release action; 0 for immediate.
-     */
-    off(offTime) {
-      const nowTime = this.minuteSynth.now()
-      if (offTime != null && offTime < nowTime) {
-        offTime = 0
-      }
-      const func = () => {
-        this.trig()
-        this.#triggered = false
-      }
-      if (offTime) {
-        setTimeout(func, (offTime - nowTime) * 1000)
-      }
-      else {
-        func() // Keep trig() call in sync if offTime is now.
-      }
-    }
-
-    trig(freq) {
-      console.assert(false, "trig() must be implemented by subclass")
-    }
-  }
-
-  /**
    * Noise produces a playable buffer of noise.
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | undefined} s - start time (default: 0)
@@ -695,7 +641,7 @@ console.log('Auto-renewing')
    * @returns {SynthModule} An instance of a noise module
    */
   Noise({ g = 1, s = 0, r, d } = {}) {
-    const module = this.Buf({ T: this.NOISE_LEN, g, s, r, d, n: 0, L: true })
+    const module = this.Buf({ T: this.noiseLen, g, s, r, d, n: 0, L: true })
     const data = module.mem()
     for (let i = 0; i < data.length; i++) {
       data[i] = Math.random() * 2 - 1
@@ -726,20 +672,18 @@ console.log('Auto-renewing')
 
   /**
    * Dist (Distort) performs a wave-shaping operation, allowing for remapping of sampled wave amplitudes
-   * @param {function(any): number[] | undefined} F - distort function (default: this.dw())
-   * @param {number | undefined} a - default function parameter (default: 50)
+   * @param {Float32Array} c - The distortion curve to apply to the incoming signal. Consider using this.dw()
    * @param {number | SynthModule | [] | undefined} g - gain (default: 1)
    * @param {number | SynthModule | [] | undefined} r$ - reverse-attach input
    * @return {SynthModule} An instance of a distortion module
    */
-  Dist({ a = 50, F = () => this.dw(a), g = 1, r$ }) {
-    // TODO: Input param: y?
+  Dist({ c, g = 1, r$ }) {
     const module = class Dist extends this.BaseAmp {
-      w = this.minuteSynth.ac.createWaveShaper()
+      w = this.m$.ac.createWaveShaper()
       constructor() {
         super(g)
-        this.w.curve = F()
-        this.w.oversample = '4x'
+        this.w.curve = c
+        this.w.oversample = 'none'
         this._addParam(new this.ParamAudio(this.w, r$))
         this.w.connect(this.z)
       }
@@ -774,11 +718,12 @@ console.log('Auto-renewing')
    */
   Filt({ t, q, f, S = 1, b, g = 1, r$ }) {
     const module = class Filt extends this.BaseAmp {
-      q = this.minuteSynth.ac.createBiquadFilter()
+      q = this.m$.ac.createBiquadFilter()
       _calcSCRate = () => S
       constructor() {
         super(g)
-        this.q.type = isNaN(t) ? t : ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
+        this.q.type = isNaN(t) ? t : t = ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass'][t - 1]
+        console.assert(this.q.type === t, "Invalid filter type specified")
         this._addParam(new this.ParamAudio(this.q, r$))
         this._addParam(new this.ParamValue('Q', this.q.Q, q))
         this._addParam(new this.ParamValue('b', this.q.gain, b))
@@ -800,7 +745,7 @@ console.log('Auto-renewing')
    */
   Conv({ b, g = 1, n = true, r$ }) {
     const Module = class Conv extends this.BaseAmp {
-      c = this.minuteSynth.ac.createConvolver()
+      c = this.m$.ac.createConvolver()
       b = b
 
       constructor() {
@@ -827,7 +772,7 @@ console.log('Auto-renewing')
    */
   Comp ({ t, k, o, a, r, g=1, r$ }={}) {
     const module = class Comp extends this.BaseAmp {
-      R = this.minuteSynth.ac.createDynamicsCompressor()
+      R = this.m$.ac.createDynamicsCompressor()
       constructor() {
         super(g)
         this._addParam(new this.ParamAudio(this.R, r$))
@@ -846,7 +791,7 @@ console.log('Auto-renewing')
    * BaseC (Constant) type that can be extended for other modules below
    */
   BaseC = class C extends this.SynthModule {
-    z = this.minuteSynth.ac.createConstantSource()
+    z = this.m$.ac.createConstantSource()
     constructor(v = 0) {
       super()
       this._addParam(new this.ParamValue('v', this.z.offset, v))
@@ -906,7 +851,7 @@ console.log('Auto-renewing')
        */
       on(onTime) {
         if (!onTime) {
-          onTime = this.minuteSynth.now()
+          onTime = this.m$.now()
         }
         if (this.#newState) {
           this.v.vT(this.a.b, onTime)
@@ -932,19 +877,14 @@ console.log('Auto-renewing')
        */
       off(offTime) {
         if (!offTime) {
-          offTime = this.minuteSynth.now()
+          offTime = this.m$.now()
         }
         if (this.a.x && this.onTime == null) {
           return // Disable early release if we have force pulsed action
         }
-        //if (this.onTime == null) {
-        //  this.v.vT(this.a.b, offTime)
-        //}
-        //else {
-          this.v.c(offTime) // if note duration is shorter than A + D.
-          this.v.t(this.a.b, offTime, this.a.r / 3)
-          this.onTime = null
-        //}
+        this.v.c(offTime) // if note duration is shorter than A + D.
+        this.v.t(this.a.b, offTime, this.a.r / 3)
+        this.onTime = null
       }
     }
     return new Module()
@@ -967,6 +907,7 @@ console.log('Auto-renewing')
       }
       t.forEach((time, i) => v[i] ? origOnFn.call(module, onTime + time, v[i])
         : origOffFn.call(module, onTime + time))
+      // TODO: Freq has no .off() method! Remove support or have another shutoff scheme.
     }
     return module
   }
@@ -998,6 +939,39 @@ console.log('Auto-renewing')
   }
 
   /**
+   * Xfade (Crossfade) module allows for smoothly transitioning between two audio sources.
+   * Set c to -1 to let all of the "A" or default input through, 1 to let all of Input "B" through,
+   * and 0 to let both through.
+   * @param {number | SynthModule | [] | undefined} c - Crossfade control value (clamps -1 to 1), default: 0
+   * @param {number | SynthModule | [] | undefined} g - Gain (default: 1)
+   * @param {SynthModule | [] | undefined} r$ - Input A for the crossfade
+   * @param {SynthModule | [] | undefined} A - Input A for the crossfade (alias for r$)
+   * @param {SynthModule | []} B - Input B for the crossfade
+   * @returns {SynthModule} An instance of a crossfade module
+   */
+  Xfade({ c = 0, g = 1, r$, A, B }) {
+    const module = class Xfade extends this.BaseAmp {
+      constructor() {
+        super(g)
+        const fadeVal = this.m$.C(c)
+        this._addParam(new this.ParamValue('c', fadeVal.z.offset, c))
+        const pcvUp = this.m$.Dist({ c: this.m$.powerCurve(true) })
+        const pcvDown = this.m$.Dist({ c: this.m$.powerCurve(false) })
+        fadeVal.$(pcvUp)
+        fadeVal.$(pcvDown)
+        const gainA = this.m$.Gain({ g: pcvUp })
+        const gainB = this.m$.Gain({ g: pcvDown })
+        this._addParam(new this.ParamAudio(gainA.z, r$))
+        this._addParam(new this.ParamValue('A', gainA.z, A))
+        this._addParam(new this.ParamValue('B', gainB.z, B))
+        gainA.z.connect(this.z)
+        gainB.z.connect(this.z)
+      }
+    }
+    return new module()
+  }
+
+  /**
    * Freq (Frequency Module) is like a voltage control to attach to oscillators and other frequency inputs.
    * It centrally manages a frequency and optionally has a glide (portamento) capability.
    * Use the t$ (second parameter) to reverse-bind a trigger.
@@ -1023,7 +997,7 @@ console.log('Auto-renewing')
        */
       on(onTime, freq) {
         if (!onTime) {
-          onTime = this.minuteSynth.now()
+          onTime = this.m$.now()
         }
         if (this.#prevFreq && this.p) {
           // Portamento control:
@@ -1073,13 +1047,13 @@ console.log('Auto-renewing')
     // TODO: Allow inputs to be registrants
     const Module = class Voice extends this.BaseAmp {
       #modules = [] // Modules registered to receive on/off triggers
-      f = this.minuteSynth.Freq({p}) // Frequency control module. Set it by calling on().
+      f = this.m$.Freq({p}) // Frequency control module. Set it by calling on().
 
       constructor() {
         super(g)
         this._addParam(new this.ParamAudio(this.z, r$))
         this._$(this.f) // Attach frequency control to the voice
-        v && this.$(this.minuteSynth.ac.destination) // Attach voice to destination if v is true
+        v && this.$(this.m$.ac.destination) // Attach voice to destination if v is true
       }
 
       /**
@@ -1187,5 +1161,21 @@ console.log('Auto-renewing')
       curve[i] = (3 + amount) * x * 20 * deg / (Math.PI + amount * Math.abs(x))
     }
     return curve
+  }
+
+  /**
+   * Return a power curve for crossfading
+   * Drawn from: https://github.com/notthetup/crossfade
+   * @param {boolean} dir - true for increasing curve 
+   * @param {number} size - Number of samples in the power curve
+   * @returns {Float32Array} The power curve array
+   */
+  powerCurve(dir, size = 1024) {
+    const curveArray = new Float32Array(size)
+    for (let index = 0; index < size; index++) {
+      const currIndex = dir ? index : size - index
+      curveArray[index] = Math.sqrt(currIndex / size)
+    }
+    return curveArray
   }
 }

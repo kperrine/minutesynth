@@ -254,7 +254,7 @@ const ToneDefs = {
       const osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1/2, g: adsr })
       const noiseADSR = m$.ADSR({ D: 0.4, b: 0, e: 0.01, s: 0.05, a: 1, d: 0.1, r: 0.1, p: 0 }, voice)
       const noise = m$.Noise({ g: noiseADSR })
-      const distort = m$.Dist({ a: 4, r$: [osc1, noise], g: 4 })
+      const distort = m$.Dist({ c: m$.dw(4), r$: [osc1, noise], g: 4 })
       const filterADSR = m$.ADSR({ D: 0.01, b: 2000, e: 50, s: 3200, a: 0.4, d: 0.1, r: 0.5, p: 0 }, voice)
   
       const filter = m$.Filt({ t: m$.F.HIGHPASS, f: filterADSR, q: 10, g: 0.65, r$: distort })
@@ -275,7 +275,7 @@ const ToneDefs = {
       const slide1 = m$.ADSR({ a: 2, b: 146, e: 0.73, s: 1, r: 1 }, voice)
       const adsr = m$.ADSR({ D: 0, b: 0, e: 2.3, s: 1.8, a: 0.03, d: 0.1, r: 0.1, p: 0 }, voice)
       const osc1 = m$.Osc({ t: m$.W.SINE, f: slide1, S: 1/2, g: adsr })
-      const distort = m$.Dist({ a: 55, r$: osc1, g: 1 })
+      const distort = m$.Dist({ c: m$.dw(55), r$: osc1, g: 1 })
       const filterADSR = m$.ADSR({ D: 0.01, b: 1000, e: 100, s: 1000, a: 0.21, d: 0.1, r: 0.9, p: 0 }, voice) // change s for fun
 
       const filter = m$.Filt({ t: m$.F.HIGHPASS, f: filterADSR, q: 8, g: 0.65, r$: distort })
@@ -345,7 +345,7 @@ const ToneDefs = {
       // NOTE: Currently does not respond to Voice frequency input.
       const voice = m$.Voice(),
             osc1 = m$.Osc({ t: m$.W.SINE, f: 50 }),
-            distorter = m$.Dist({ a: 30, r$: osc1 }),
+            distorter = m$.Dist({ c: m$.dw(30), r$: osc1 }),
             filter = m$.Filt({ t: m$.F.HIGHPASS, q: 0.5, f: 3000, r$: distorter }),
               // Bring down f to your liking
             compressor = m$.Comp({ k: 0.5, g: 5, r$: filter }),
@@ -364,17 +364,17 @@ const ToneDefs = {
       const voice = m$.Voice(),
             noise = m$.Noise(),
             noiseGate = m$.Noise({ r: 0.001 }),
-            gateDistort = m$.Dist({ a: 500, r$: noiseGate, g: 5 }),
+            gateDistort = m$.Dist({ c: m$.dw(500), r$: noiseGate, g: 5 }),
             noiseGain = m$.Gain({ g: 0.5, r$: gateDistort }),
             filter = m$.Filt({ t: 'bandpass', q: 30, f: 2200, r$: noise,
                                g: [0.5, noiseGain] }),
-            distorter = m$.Dist({ a: 50, r$: filter }),
+            distorter = m$.Dist({ c: m$.dw(50), r$: filter }),
             otherGate = m$.Osc({ t: 'square', f: 31, g: 0.5 }),
             otherGate2 = m$.Osc({ t: 'square', f: 13, g: 0.5 }),
             gateGain1 = m$.Gain({ g: [0.5, otherGate], r$: distorter }),
             gateGain2 = m$.Gain({ g: [0.7, otherGate2], r$: gateGain1 }),
             filterAgain = m$.Filt({ t: 'bandpass', q: 30, f: 4400, r$: gateGain2, g: 2 }),
-            distorterAgain = m$.Dist({ a: 1.2, g: 30, r$: filterAgain })
+            distorterAgain = m$.Dist({ c: m$.dw(1.2), g: 30, r$: filterAgain })
       distorterAgain.$(voice)
       return voice
     },
@@ -422,14 +422,34 @@ const ToneDefs = {
           highpass = m$.Filt({ t: m$.F.HIGHPASS, q: 4, f: fADSR, r$: [tone1, tone2] }),
           lowpass = m$.Filt({ t: m$.F.LOWPASS, q: 0.2, f: 4000, r$: highpass }),
           ampADSR = m$.ADSR({ d: 3, s: 0.8, r: 0.1 }, voice),
-          amp = m$.Gain({ g: ampADSR, r$: [tone1, tone2, lowpass] });
+          amp = m$.Gain({ g: ampADSR, r$: [tone1, tone2, lowpass] })
       voice.f.$(tone1.f)
       voice.f.$(tone2.f)
-      amp.$(voice);
-      return voice;
+      amp.$(voice)
+      return voice
     },
     off: 2.2,
     rec: 2.3
+  },
+  xfade: {
+    fn: m$ => {
+      const voice = m$.Voice()
+
+      // Create two tones:
+      const adsr = m$.ADSR({ a: 0.05, e: 0.6, d: 1, s: 0.5, r: 0.3 }, voice)
+      const tone1 = m$.Osc({ t: m$.W.SQUARE, f: voice.f, g: adsr })
+      const tone2 = m$.Osc({ t: m$.W.SINE, f: 350, g: adsr })
+
+      // Set up a crossfade between them using a bouncy level
+      const level = m$.Osc({ t: m$.W.TRIANGLE, f: 1, g: 1.2 })
+
+      // Crossfade!
+      const xfader = m$.Xfade({ c: level, A: tone1, B: tone2 })
+      xfader.$(voice)
+      return voice
+    },
+    off: 4,
+    rec: 4.5
   },
   hiHat: {
     fn: m$ => {
@@ -509,7 +529,7 @@ const ToneDefs = {
           fMult = m$.Gain({ g: fADSR, r$: voice.f }),
           filter = m$.Filt({ t: 'lowpass', g: 1, q: 1, f: fMult }),
           dADSR = m$.ADSR({ a: 0.01, e: 0.3, r: 0.8, p: 0.02 }, voice),
-          distorter = m$.Dist({ a: 2, g: dADSR, r$: filter }),
+          distorter = m$.Dist({ c: m$.dw(2), g: dADSR, r$: filter }),
           mADSR = m$.ADSR({ a: 0.01, r: 1.5, p: 0.02 }, voice),
           mAmp = m$.Gain({ g: mADSR, r$: filter }),
           harmonics = [0.5, 2, 3, 4.2, 5.4, 6.8]
@@ -531,7 +551,7 @@ const ToneDefs = {
           fADSR = m$.ADSR({ b: 0.05, a: 0.5, e: .4, d: 1, s: 0.5, r: 0.2 }, voice),
           fADSRMult = m$.Gain({ g: voice.f, r$: fADSR }),
           filter = m$.Filt({ t: m$.F.LOWPASS, q: 1, f: fADSRMult, r$: modulator }),
-          distorter = m$.Dist({ a: 15, r$: filter }),
+          distorter = m$.Dist({ c: m$.dw(15), r$: filter }),
           loud = m$.Gain({ g: 3, r$: distorter })
       loud.$(voice)
       m$.ADSR({r: 1}, voice).$(voice.g)
@@ -579,33 +599,22 @@ const ToneDefs = {
 
       // Resources for programmed frequencies:
       const TONES = [
-          { freq: NOTES.cN, oct: 3, dur: 1/4 },
-          { freq: NOTES.eN, oct: 3, dur: 1/4 },
-          { freq: NOTES.cN, oct: 3, dur: 1/4 },
-          { freq: NOTES.gN, oct: 3, dur: 1/4 },
-          { freq: NOTES.cN, oct: 3, dur: 1/4 },
-          { freq: NOTES.cN, oct: 4, dur: 1/4 },
-          { freq: NOTES.bN, oct: 3, dur: 1/8 },
-          { freq: NOTES.aN, oct: 3, dur: 1/8 },
-          { freq: NOTES.gN, oct: 3, dur: 1/8 },
-          { freq: NOTES.aN, oct: 3, dur: 1/8 },
-          { freq: NOTES.gN, oct: 3, dur: 1/8 },
-          { freq: NOTES.fN, oct: 3, dur: 1/8 },
-          { freq: NOTES.eN, oct: 3, dur: 1/8 },
-          { freq: NOTES.fN, oct: 3, dur: 1/8 },
-          { freq: NOTES.eN, oct: 3, dur: 1/8 },
-          { freq: NOTES.dN, oct: 3, dur: 1/8 },
-          { freq: NOTES.cN, oct: 3, dur: 1/2 }
+          { freq: NOTES.cN, oct: 3, dur: 1/16 },
+          { freq: NOTES.dS, oct: 3, dur: 1/16 },
+          { freq: NOTES.gN, oct: 3, dur: 1/16 },
       ]
-      let timePoint = -(TONES[0].dur * WHOLE_DUR)
+      const REPEATS = 16
+      const tonesRep = Array(REPEATS).fill(TONES).flat()
+
+      let timePoint = -(tonesRep[0].dur * WHOLE_DUR)
       const program = m$.Prog({
           v: [ // Record all values; in this case, "frequency base" to signify note.
               // Each "frequency base" will be multiplied below by the voice frequency
               // generator to transpose to the key desired.
-              ...TONES.map(elem => getFreqBase(elem.oct, elem.freq))
+              ...tonesRep.map(elem => getFreqBase(elem.oct, elem.freq))
           ],
           t: [ // Times to set all value changes:
-              ...TONES.map(elem => timePoint += elem.dur * WHOLE_DUR),
+              ...tonesRep.map(elem => timePoint += elem.dur * WHOLE_DUR),
           ]
           // HINT: Add "p" parameter (e.g. p: 0.05) to glide between values!
       })
@@ -616,8 +625,8 @@ const ToneDefs = {
       const adjFreq = m$.Gain({ r$: program, g: voice.f })
 
       // Next, tone generation, etc.
-      const tone = m$.Osc({ t: m$.W.TRIANGLE, f: adjFreq, g: 0.5 })
-      const adsr = m$.ADSR({ d: 5, s: 0 }, voice) // Quick onset, slow decay
+      const tone = m$.Osc({ t: m$.W.TRIANGLE, f: adjFreq, g: 1/2 })
+      const adsr = m$.ADSR({ d: 2.5, s: 0, r: 1/4 }, voice) // Quick onset, slow decay
       const amp = m$.Gain({ r$: tone, g: adsr })
       amp.$(voice) // Plug amp output into voice
       voice.$(program) // Voice object triggers the program
@@ -645,75 +654,28 @@ const ToneDefs = {
     off: 10,
     rec: 10
   },
-  zzFx1: {
-    fn: async function(m$) {
-      // Example of using Frank Force's ZzFx generation output as a buffered
-      // playback within the MinuteSynth framework. First, here is a copy of the
-      // ZzFxMicro.min.js code that you would typically include in your HTML:
+  zzFx: {
+    fn: m$ => {
+      // Example of playing ZzFx sounds by using a slightly modified version:
       // -----
       let // ZzFXMicro - Zuper Zmall Zound Zynth - v1.3.2 by Frank Force
       zzfxV=.3,               // volume
-      zzfxX=new AudioContext, // audio context
-      zzfx=                   // play sound
-      (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0,N=0)=>{let M=Math,d=2*M.PI,R=44100,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,H=0,a=0,n=1,I=0,J=0,f=0,h=N<0?-1:1,x=d*h*N*2/R,L=M.cos(x),Z=M.sin,K=Z(x)/4,O=1+K,X=-2*L/O,Y=(1-K)/O,P=(1+h*L)/2/O,Q=-(h+L)/O,S=P,T=0,U=0,V=0,W=0;e=R*e+9;m*=R;r*=R;t*=R;c*=R;y*=500*d/R**3;A*=d/R;v*=d/R;z*=R;l=R*l|0;p*=zzfxV;for(h=e+m+r+t+c|0;a<h;k[a++]=f*p)++J%(100*F|0)||(f=q?1<q?2<q?3<q?4<q?(g/d%1<D/2)*2-1:Z(g**3):M.max(M.min(M.tan(g),1),-1):1-(2*g/d%2+2)%2:1-4*M.abs(M.round(g/d)-g/d):Z(g),f=(l?1-B+B*Z(d*a/l):1)*(4<q?s:(f<0?-1:1)*M.abs(f)**D)*(a<e?a/e:a<e+m?1-(a-e)/m*(1-w):a<e+m+r?w:a<h-c?(h-a-c)/t*w:0),f=c?f/2+(c>a?0:(a<h-c?1:(h-a)/c)*k[a-c|0]/2/p):f,N?f=W=S*T+Q*(T=U)+P*(U=f)-Y*V-X*(V=W):0),x=(b+=u+=y)*M.cos(A*H++),g+=x+x*E*Z(a**5),n&&++n>z&&(b+=v,C+=v,n=0),!l||++I%l||(b=C,u=G,n=n||1);X=zzfxX,p=X.createBuffer(1,h,R);p.getChannelData(0).set(k);b=X.createBufferSource();b.buffer=p;b.connect(X.destination);b.start()}
+      /* zzfxX=new AudioContext, // audio context */
+      zzfx=                   /* // play sound */ // return sound buffer
+      (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0,N=0)=>{let M=Math,d=2*M.PI,R=44100,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,H=0,a=0,n=1,I=0,J=0,f=0,h=N<0?-1:1,x=d*h*N*2/R,L=M.cos(x),Z=M.sin,K=Z(x)/4,O=1+K,X=-2*L/O,Y=(1-K)/O,P=(1+h*L)/2/O,Q=-(h+L)/O,S=P,T=0,U=0,V=0,W=0;e=R*e+9;m*=R;r*=R;t*=R;c*=R;y*=500*d/R**3;A*=d/R;v*=d/R;z*=R;l=R*l|0;p*=zzfxV;for(h=e+m+r+t+c|0;a<h;k[a++]=f*p)++J%(100*F|0)||(f=q?1<q?2<q?3<q?4<q?(g/d%1<D/2)*2-1:Z(g**3):M.max(M.min(M.tan(g),1),-1):1-(2*g/d%2+2)%2:1-4*M.abs(M.round(g/d)-g/d):Z(g),f=(l?1-B+B*Z(d*a/l):1)*(4<q?s:(f<0?-1:1)*M.abs(f)**D)*(a<e?a/e:a<e+m?1-(a-e)/m*(1-w):a<e+m+r?w:a<h-c?(h-a-c)/t*w:0),f=c?f/2+(c>a?0:(a<h-c?1:(h-a)/c)*k[a-c|0]/2/p):f,N?f=W=S*T+Q*(T=U)+P*(U=f)-Y*V-X*(V=W):0),x=(b+=u+=y)*M.cos(A*H++),g+=x+x*E*Z(a**5),n&&++n>z&&(b+=v,C+=v,n=0),!l||++I%l||(b=C,u=G,n=n||1);/* X=zzfxX,p=X.createBuffer(1,h,R);p.getChannelData(0).set(k);b=X.createBufferSource();b.buffer=p;b.connect(X.destination);b.start() */
+        /* ADDED THIS --> */ return k }
       // -----
-
-      // Now, after including that stuff above, replace the AudioContext for buffering:
-      const DUR_SECONDS = 1.1
-      const ZZ_FREQ = 440
-      zzfxX = new OfflineAudioContext(1, ~~(m$.ac.sampleRate * DUR_SECONDS), m$.ac.sampleRate)
+      // NOTE: For purposes of this demo, I am grabbing the zzfx buffer k so I
+      // can use it with MinuteSynth. /* Some ZzFXMicro code is commented out! */
 
       // Run a ZzFx call that I made in https://killedbyapixel.github.io/ZzFX/
-      zzfx(...[.8,.1,ZZ_FREQ,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
+      const k = zzfx(...[.8,.1,,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
 
-      // Grab buffer contents and run with it:
-      const renderedBuffer = await zzfxX.startRendering()
-      const srcBuf = renderedBuffer.getChannelData(0)
-      // (It could have also been possible to create a special version of ZzFx that
-      // allows me access to the generated buffer "k")
-
-      // At this time, I'll set up my MinuteSynth stuff, but it can be done anywhere:
-      const tgtBuf = m$.Buf({ T: DUR_SECONDS, n: ZZ_FREQ })
-      const mem = tgtBuf.mem()
-      const bufLen = Math.min(srcBuf.length, mem.length)
-      for (let i = 0; i < bufLen; i++) {
-        mem[i] = srcBuf[i]
-      }
-
-      // Set up output voice, and connect my MinuteSynth module buffer to it:
-      const voice = m$.Voice()
-      voice.rg(tgtBuf)
-      voice.f.$(tgtBuf.f) // Hook up frequency control, too
-      tgtBuf.$(voice)
-      return voice
-    },
-    off: 2,
-    rec: 2
-  },
-  zzFx2: {
-    fn: async function(m$) {
-      // Example of playing ZzFx sounds by calling zzfx() directly with triggering:
-      // -----
-      let // ZzFXMicro - Zuper Zmall Zound Zynth - v1.3.2 by Frank Force
-      zzfxV=.3,               // volume
-      zzfxX=new AudioContext, // audio context
-      zzfx=                   // play sound
-      (p=1,k=.05,b=220,e=0,r=0,t=.1,q=0,D=1,u=0,y=0,v=0,z=0,l=0,E=0,A=0,F=0,c=0,w=1,m=0,B=0,N=0)=>{let M=Math,d=2*M.PI,R=44100,G=u*=500*d/R/R,C=b*=(1-k+2*k*M.random(k=[]))*d/R,g=0,H=0,a=0,n=1,I=0,J=0,f=0,h=N<0?-1:1,x=d*h*N*2/R,L=M.cos(x),Z=M.sin,K=Z(x)/4,O=1+K,X=-2*L/O,Y=(1-K)/O,P=(1+h*L)/2/O,Q=-(h+L)/O,S=P,T=0,U=0,V=0,W=0;e=R*e+9;m*=R;r*=R;t*=R;c*=R;y*=500*d/R**3;A*=d/R;v*=d/R;z*=R;l=R*l|0;p*=zzfxV;for(h=e+m+r+t+c|0;a<h;k[a++]=f*p)++J%(100*F|0)||(f=q?1<q?2<q?3<q?4<q?(g/d%1<D/2)*2-1:Z(g**3):M.max(M.min(M.tan(g),1),-1):1-(2*g/d%2+2)%2:1-4*M.abs(M.round(g/d)-g/d):Z(g),f=(l?1-B+B*Z(d*a/l):1)*(4<q?s:(f<0?-1:1)*M.abs(f)**D)*(a<e?a/e:a<e+m?1-(a-e)/m*(1-w):a<e+m+r?w:a<h-c?(h-a-c)/t*w:0),f=c?f/2+(c>a?0:(a<h-c?1:(h-a)/c)*k[a-c|0]/2/p):f,N?f=W=S*T+Q*(T=U)+P*(U=f)-Y*V-X*(V=W):0),x=(b+=u+=y)*M.cos(A*H++),g+=x+x*E*Z(a**5),n&&++n>z&&(b+=v,C+=v,n=0),!l||++I%l||(b=C,u=G,n=n||1);X=zzfxX,p=X.createBuffer(1,h,R);p.getChannelData(0).set(k);b=X.createBufferSource();b.buffer=p;b.connect(X.destination);b.start()}
-      // -----
-
-      // Now, after including that stuff above, prepare to receive triggers:
-      zzfxX = m$.ac // Use the MinuteSynth AudioContext
-      const voice = m$.Voice()
-      class TrigDest extends m$.Trig {
-        trig(freq) {
-          if (freq) {
-            // Run a ZzFx call that I made in https://killedbyapixel.github.io/ZzFX/
-            zzfx(...[.8,.1,freq,.01,.19,.35,2,2.3,,,,,,.1,1,,,,,.25,16])
-          }
-          // Ignore if frequency is undefined.
-        }
-      }
-      voice.rg(new TrigDest()) // Register trigger dest. with the voice
+      // Now build up buffered playback:
+      const voice = m$.Voice({ g: 2 })
+      const buf = m$.Buf({ T: k.length / 44100, F: 44100, n: 220, f: voice.f, L: true }, voice)
+      buf.mem().set(k)
+      buf.$(voice)
       return voice
     },
     off: 2,
